@@ -250,6 +250,78 @@
 
 ---
 
+## [2026-04-11] - Task #17: 设计 Catlike Coding 风格的引擎教程作业
+
+### What was done:
+- 回顾了现有 intern_assignments.md 的作业设计
+- 应用 Catlike Coding 风格原则重构了 4 个教程：
+  1. **组件系统入门** - RotateComponent
+  2. **向量数学应用** - MovingPlatform
+  3. **物理系统入门** - TriggerZone
+  4. **事件系统应用** - TimerTrigger
+- 每个教程采用渐进式结构：
+  - 概述和前置要求
+  - 分步骤代码实现（增量展示）
+  - 即时验证和预期结果
+  - 练习题（基础/进阶/挑战）
+  - 验证标准
+  - 总结和下一步
+
+### Testing:
+- 文档输出: docs/homework/catlike_style_tutorials.md
+
+### Notes:
+- 教程采用问题驱动方式，每节以问题开始
+- 代码以增量片段展示，标记新增/修改部分
+- 添加了 Q&A 侧边栏解释设计决策
+- 每个步骤都有验证方法和预期效果
+
+---
+
+## [2026-04-11] - Task #16: 调研 Catlike Coding 教学风格
+
+### What was done:
+- 访问并分析了 Catlike Coding 网站 (https://catlikecoding.com/)
+- 分析了 8 个代表性教程系列：
+  - Unity Basics (Game Objects and Scripts, Building a Graph)
+  - Custom SRP (Custom Render Pipeline, Draw Calls)
+  - Pseudorandom Noise (Hashing, Perlin Noise)
+  - Flow (Texture Distortion)
+  - Advanced Rendering (Triplanar Mapping)
+- 总结了 6 大教学设计原则：
+  1. 渐进式构建原则 (Progressive Construction)
+  2. 问题驱动原则 (Problem-Driven)
+  3. 增量展示原则 (Incremental Disclosure)
+  4. 即时验证原则 (Immediate Verification)
+  5. 概念分层原则 (Conceptual Layering)
+  6. 系列连贯原则 (Series Continuity)
+- 提出了针对 LitchiEngine 的教程设计建议
+
+### Testing:
+- 文档输出: docs/analysis/15_catlike_coding_style.md
+
+### Notes:
+- Catlike Coding 采用增量代码片段展示，不展示完整文件
+- 每个步骤后必有验证图像（渲染结果、Frame Debugger、性能数据）
+- 教程本身即实践过程，无显式练习题
+- 建议为 LitchiEngine 添加显式练习和验证标准
+
+---
+
+## [2026-04-11] - 新增任务：Catlike Coding 风格教程设计
+
+### What was done:
+- 新增任务 #16：调研 Catlike Coding 教学风格
+- 新增任务 #17：设计 Catlike Coding 风格的引擎教程作业
+- 任务依赖关系：#17 依赖 #16 完成
+
+### Notes:
+- Catlike Coding 是业界知名的游戏开发教程网站
+- 其教学风格以渐进式、代码驱动、图文并茂著称
+- 目标是将这种风格应用到 LitchiEngine 实习生作业设计中
+
+---
+
 ## 已完成任务
 
 ### 分析任务 (Analysis Tasks)

@@ -375,6 +375,61 @@
           "为后续扩展引擎打下基础"
         ]
       }
+    },
+    {
+      "id": 16,
+      "title": "调研 Catlike Coding 教学风格",
+      "description": "深入调研 https://catlikecoding.com/ 网站的教学风格，分析其教程结构、代码讲解方式、图文配合、难度递进等特点，为设计引擎教程作业提供参考。",
+      "steps": [
+        "访问 Catlike Coding 网站，了解其教程系列概览",
+        "分析教程结构：章节组织、知识点划分、渐进式设计",
+        "分析代码讲解方式：代码展示、注释风格、解释深度",
+        "分析图文配合：示意图、效果图、动画的使用",
+        "分析难度递进：从简单到复杂的过渡方式",
+        "分析实践设计：练习题、挑战任务、验证方法",
+        "总结 Catlike Coding 教学风格的核心特征",
+        "提出适合 LitchiEngine 的教程设计建议"
+      ],
+      "priority": "high",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "调研报告需包含具体示例引用",
+        "需总结出可复用的教学设计原则",
+        "需提出针对 LitchiEngine 的具体建议"
+      ],
+      "output_file": "docs/analysis/15_catlike_coding_style.md",
+      "category": "research",
+      "reference_url": "https://catlikecoding.com/"
+    },
+    {
+      "id": 17,
+      "title": "设计 Catlike Coding 风格的引擎教程作业",
+      "description": "基于 Catlike Coding 教学风格调研结果，重新设计 LitchiEngine 实习生教程作业。采用渐进式、代码驱动、图文并茂的教学风格。",
+      "steps": [
+        "回顾现有 intern_assignments.md 的作业设计",
+        "应用 Catlike Coding 风格原则重构作业",
+        "设计渐进式章节结构（从简单到复杂）",
+        "编写详细的代码讲解（带注释和解释）",
+        "设计配套的示意图和效果图说明",
+        "添加验证步骤和预期结果",
+        "添加扩展挑战和进阶内容"
+      ],
+      "priority": "high",
+      "dependencies": [16],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "教程需采用渐进式结构",
+        "每个步骤需有清晰的代码示例",
+        "需有验证方法和预期结果",
+        "需有扩展挑战"
+      ],
+      "output_file": "docs/homework/catlike_style_tutorials.md",
+      "category": "design"
     }
   ]
 }
