@@ -1,0 +1,43 @@
+{
+  "project_name": "LitchiEngine",
+  "app_root": ".",
+  "artifacts": {
+    "architecture": "architecture.md",
+    "tasks": "task.json",
+    "progress": "progress.txt"
+  },
+  "bootstrap_commands": [
+    "cmake -B Build -DCMAKE_BUILD_TYPE=Debug",
+    "cmake --build Build --config Debug"
+  ],
+  "dev_server_commands": [],
+  "validation_commands": [
+    "cmake --build Build --config Debug"
+  ],
+  "browser_test_required_when": [],
+  "blocking_prerequisites": [
+    "Vulkan SDK 安装",
+    "Mono 运行时安装",
+    "CMake 3.20+",
+    "Visual Studio 2019+ 或兼容编译器"
+  ],
+  "analysis_output_dir": "docs/analysis",
+  "homework_output_dir": "docs/homework",
+  "target_audience": {
+    "background": "Games101/Games104 实习生",
+    "skills": [
+      "基础渲染管线知识",
+      "着色器编程基础",
+      "游戏引擎架构概念",
+      "C++ 编程能力",
+      "基础数学知识 (线性代数)"
+    ],
+    "learning_goals": [
+      "理解游戏引擎的整体架构",
+      "掌握组件系统的设计和扩展",
+      "学习渲染系统的实现细节",
+      "实践脚本系统的使用",
+      "培养代码规范和工程能力"
+    ]
+  }
+}

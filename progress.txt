@@ -1,0 +1,293 @@
+# Progress Log
+
+## [2026-04-10] - Task: 设计实习生扩展开发作业
+
+### What was done:
+- 分析了 Games101/Games104 学员的知识背景
+- 设计了 10 个难度递进的作业任务：
+  1. 旋转组件 (RotateComponent) - 入门级
+  2. 跟随相机组件 (FollowCamera) - 初级
+  3. 简单粒子系统 (ParticleSystem) - 中级
+  4. 自定义着色器材质 (CustomShaderMaterial) - 中级
+  5. C# 脚本组件 (CustomScriptComponent) - 中级
+  6. 物理拾取系统 (PhysicsPickup) - 初级
+  7. 简单状态机 (StateMachine) - 中级
+  8. 资源热重载系统 (HotReload) - 高级
+  9. UI 按钮组件 (UIButton) - 初级
+  10. 场景序列化扩展 (SceneSerialization) - 高级
+- 每个作业包含：目标描述、涉及模块、实现步骤、验收标准、预计时间、扩展挑战
+- 编写了附录：开发环境配置、代码规范参考、评分标准
+
+### Testing:
+- 文档输出: docs/homework/intern_assignments.md
+
+### Notes:
+- 作业覆盖组件系统、渲染系统、脚本系统、物理系统、动画系统、UI系统、资源管理
+- 难度从入门级 (⭐) 到高级 (⭐⭐⭐⭐) 递进
+- 每个作业都有明确的验收标准和扩展挑战
+- 评分标准包含功能完整性、代码质量、验收通过、扩展挑战四个维度
+
+---
+
+## [2026-04-10] - Task: 分析编辑器架构
+
+### What was done:
+- 分析了 ApplicationEditor 类：初始化流程、主循环、渲染路径
+- 分析了 PanelsManager 面板管理器：面板创建、面板注册、面板获取
+- 分析了 Inspector 检视面板：属性绘制、组件编辑、RTTR 反射集成
+- 分析了 Hierarchy 层级面板：GameObject 层级显示、拖拽重排
+- 分析了 SceneView 场景视图：编辑器相机控制、Gizmo 操作
+- 分析了 GameView 游戏视图：游戏预览、分辨率设置
+- 分析了 AssetBrowser 资源浏览器：资源浏览、拖拽导入
+- 分析了 EditorActions 编辑器操作：场景操作、GameObject 操作、播放控制
+
+### Testing:
+- 文档输出: docs/analysis/10_editor_architecture.md
+
+### Notes:
+- 使用 ImGui 构建编辑器 UI
+- 采用面板化设计，支持灵活的窗口布局
+- Inspector 使用 RTTR 反射自动绘制属性
+- 支持编辑器模式和运行模式切换
+- 渲染路径支持 SceneView、GameView、AssetView 三种视图
+
+---
+
+## [2026-04-10] - Task: 分析着色器系统
+
+### What was done:
+- 分析了常量缓冲区布局：Frame、RendererPath、Light、Material、Pass、Bone
+- 分析了 PBRTest.hlsl：纹理采样、法线计算、PBR 光照
+- 分析了 PBR 光照计算：D (法线分布)、F (Fresnel)、G (几何遮蔽)
+- 分析了阴影映射：ShadowCalculation2、级联阴影、点光源阴影
+- 分析了颜色空间转换：sRGB ↔ Linear
+- 分析了材质属性标志：纹理属性、帧选项
+- 分析了着色器编译流程：HLSL → DXCompiler → SPIR-V
+
+### Testing:
+- 文档输出: docs/analysis/09_shader_system.md
+
+### Notes:
+- 使用 HLSL 编写着色器，通过 DXCompiler 编译为 SPIR-V
+- 常量缓冲区使用 register(bN) 绑定
+- 纹理使用 register(tN) 绑定
+- Push Constant 用于 Per-Object 数据
+- PBR 使用 GGX 分布、Schlick Fresnel、Smith 几何遮蔽
+
+---
+
+## [2026-04-10] - Task: 分析资源管理系统
+
+### What was done:
+- 分析了 IResource 资源接口：资源类型、路径管理、IO 操作
+- 分析了 AResourceManager 模板基类：加载/卸载/重载、缓存管理、路径转换
+- 分析了具体资源管理器：TextureManager、MaterialManager、ModelManager
+- 分析了 AssetManager 序列化：JSON 序列化/反序列化
+- 分析了资源路径约定：引擎路径 (:) 和项目路径
+
+### Testing:
+- 文档输出: docs/analysis/08_resource_management.md
+
+### Notes:
+- 使用模板方法模式统一资源管理流程
+- 使用工厂方法模式让子类实现资源创建
+- 使用缓存模式避免重复加载
+- 支持引擎路径和项目路径两种格式
+- 通过 Serializer 实现 JSON 序列化
+
+---
+
+## [2026-04-10] - Task: 分析场景管理系统
+
+### What was done:
+- 分析了 Scene 类设计：GameObject 管理、生命周期驱动、预制体实例化
+- 分析了 SceneManager 类：场景加载/卸载/保存、路径管理、事件系统
+- 分析了 Prefab 预制体系统：可复用模板、深拷贝实例化
+- 分析了序列化机制：通过 AssetManager 进行场景序列化/反序列化
+- 分析了层级关系重建：PostResourceLoaded 中重建父子关系
+
+### Testing:
+- 文档输出: docs/analysis/07_scene_management.md
+
+### Notes:
+- Scene 管理 GameObject 列表，分配唯一 ID
+- SceneManager 是单例，管理当前场景
+- Prefab 使用原型模式实现深拷贝实例化
+- 场景加载后通过 PostResourceLoaded 重建层级关系
+- 支持场景事件：加载、卸载、路径变更
+
+---
+
+## [2026-04-10] - Task: 分析组件系统架构
+
+### What was done:
+- 分析了 GameObject 类设计：组件容器、生命周期管理、层级关系
+- 分析了 Component 基类设计：生命周期回调、所属 GameObject 引用
+- 分析了 Transform 组件：位置/旋转/缩放、层级变换、世界/局部空间转换
+- 分析了 MeshRenderer 组件：材质管理、阴影控制、渲染集成
+- 分析了 Camera 组件：视图投影矩阵、射线拾取、视锥剔除
+- 分析了组件类型总览：核心组件、渲染组件、物理组件、脚本组件、UI组件
+- 分析了事件系统：组件添加/移除事件、全局创建/销毁事件
+- 总结了组件扩展方式：继承 Component、RTTR 注册、生命周期实现
+
+### Testing:
+- 文档输出: docs/analysis/06_component_system.md
+
+### Notes:
+- 使用组合模式实现灵活的对象功能组合
+- 使用模板方法模式统一生命周期流程
+- 使用 RTTR 反射支持运行时类型查询和序列化
+- 组件生命周期: OnAwake → OnEnable → OnStart → OnUpdate → OnDisable → OnDestroy
+- Transform 是必需组件，管理层级变换
+
+---
+
+## [2026-04-10] - Task: 分析脚本系统架构
+
+### What was done:
+- 分析了 ScriptEngine 初始化流程：Mono 运行时初始化、程序集加载、类型加载
+- 分析了 ScriptClass 脚本类句柄：MonoClass 封装、方法调用、字段反射
+- 分析了 ScriptInstance 脚本实例：MonoObject 管理、生命周期调用、字段访问
+- 分析了 C++/C# 对象映射：通过 unmanagedId 双向关联
+- 分析了 InternalCalls 内部调用机制：mono_add_internal_call 注册
+- 分析了 C# 脚本核心类：ScriptObject、GameObject、Component、ScriptComponent
+- 分析了脚本字段系统：类型映射、字段实例存储
+
+### Testing:
+- 文档输出: docs/analysis/05_script_system.md
+
+### Notes:
+- 使用 Mono 运行时实现 C# 脚本支持
+- C++/C# 通过 unmanagedId 进行对象映射
+- InternalCalls 实现跨语言调用
+- 支持调试模式 (PDB 加载、调试器连接)
+- 脚本生命周期: OnAwake → OnStart → OnUpdate
+
+---
+
+## [2026-04-10] - Task: 分析渲染管线实现
+
+### What was done:
+- 分析了 Renderer 类的整体架构：生命周期管理、资源管理、渲染 Pass 调度
+- 分析了 RendererPath 渲染路径抽象：多视图支持、视锥剔除、排序策略
+- 分析了 Pass_ShadowMaps 阴影渲染：从光源视角渲染深度图
+- 分析了 Pass_SkyBox 天空盒渲染：立方体贴图、深度测试 LessEqual
+- 分析了 Pass_ForwardPass 前向渲染：PBR 材质、光源计算
+- 分析了 Pass_UIPass UI 渲染：正交投影、Alpha 混合
+- 分析了光源系统：方向光、点光源、聚光灯的结构化缓冲
+- 分析了 PBR 材质系统：GGX 分布、Schlick 几何、Fresnel 方程
+- 分析了常量缓冲布局：Frame、Camera、Object、Material
+- 分析了渲染目标和采样器配置
+
+### Testing:
+- 文档输出: docs/analysis/04_rendering_pipeline.md
+
+### Notes:
+- 渲染流程: SkyBox → ShadowMaps → ForwardPass → UIPass → Debug
+- RendererPath 支持多视图：SceneView、GameView、AssetView
+- PBR 使用 GGX/Trowbridge-Reitz 法线分布函数
+- 光源数据通过结构化缓冲传递给着色器
+- 支持视锥剔除和材质排序优化
+
+---
+
+## [2026-04-10] - Task: 分析 Vulkan 后端实现
+
+### What was done:
+- 分析了 Vulkan_Device.cpp：设备初始化流程、物理设备选择、队列管理、VMA 内存分配器集成
+- 分析了 Vulkan_Pipeline.cpp：图形/计算管线创建、动态渲染 (VK_KHR_dynamic_rendering)、管线缓存机制
+- 分析了 Vulkan_Shader.cpp：HLSL 到 SPIR-V 编译流程、DXCompiler 参数配置、SPIR-V 反射
+- 分析了 Vulkan_CommandList.cpp：命令录制流程、动态渲染 Pass、描述符绑定策略
+- 分析了描述符管理：Bindless 资源、描述符池、动态偏移
+- 分析了同步机制：Semaphore、Fence、延迟删除队列
+
+### Testing:
+- 文档输出: docs/analysis/03_vulkan_backend.md
+
+### Notes:
+- 使用 Vulkan 1.3 API，支持动态渲染 (无需 RenderPass)
+- 使用 VMA (Vulkan Memory Allocator) 管理 GPU 内存
+- 使用 DXCompiler 将 HLSL 编译为 SPIR-V
+- 实现 Bindless 资源绑定，支持大量纹理
+- 管线缓存使用哈希键避免重复创建
+- 延迟删除机制确保 GPU 同步
+
+---
+
+## [2026-04-09] - Task: 分析 Core 模块架构
+
+### What was done:
+- 分析了 Math 模块：Vector3, Matrix, Quaternion, BoundingBox, Frustum, MathHelper
+- 分析了反射系统：Object 基类、TypeManager、RTTR 集成
+- 分析了事件系统：Event 模板类设计
+- 分析了窗口管理：Window 类、InputManager
+- 分析了应用程序框架：ApplicationBase
+- 分析了服务定位器：ServiceLocator
+
+### Testing:
+- 文档输出: docs/analysis/01_core_module.md
+
+### Notes:
+- 数学库使用 Column-major 内存布局，兼容 GPU
+- 使用 RTTR 库实现运行时类型反射
+- Event 系统使用 ListenerID 管理回调
+- 代码规范：类名 PascalCase，成员变量 m_ 前缀
+
+---
+
+## [2026-04-09] - 初始化项目分析框架
+
+### What was done:
+- 创建 architecture.md 架构文档
+- 创建 task.json 任务列表，包含 15 个分析任务和 1 个作业设计任务
+- 创建 progress.txt 进度日志
+- 创建 project-config.json 项目配置
+
+### Notes:
+- 项目使用 task-driven-ai-dev 工作流
+- 分析任务按依赖关系组织，需要按顺序执行
+- 最终目标是设计适合 Games101/Games104 实习生的扩展开发作业
+
+---
+
+## 已完成任务
+
+### 分析任务 (Analysis Tasks)
+1. [x] 分析 Core 模块架构
+2. [x] 分析 RHI 抽象层设计
+3. [x] 分析 Vulkan 后端实现
+4. [x] 分析渲染管线实现
+5. [x] 分析脚本系统架构
+6. [x] 分析组件系统架构
+7. [x] 分析场景管理系统
+8. [x] 分析资源管理系统
+9. [x] 分析着色器系统
+10. [x] 分析编辑器架构
+11. [x] 分析物理系统
+12. [x] 分析动画系统
+13. [x] 分析 UI 系统
+14. [x] 总结项目代码规范
+
+### 设计任务 (Design Tasks)
+15. [x] 设计实习生扩展开发作业
+
+---
+
+## 所有任务已完成 ✅
+
+项目分析任务全部完成，共生成以下文档：
+- `docs/analysis/01_core_module.md` - Core 模块分析
+- `docs/analysis/02_rhi_abstraction.md` - RHI 抽象层分析
+- `docs/analysis/03_vulkan_backend.md` - Vulkan 后端分析
+- `docs/analysis/04_rendering_pipeline.md` - 渲染管线分析
+- `docs/analysis/05_script_system.md` - 脚本系统分析
+- `docs/analysis/06_component_system.md` - 组件系统分析
+- `docs/analysis/07_scene_management.md` - 场景管理分析
+- `docs/analysis/08_resource_management.md` - 资源管理分析
+- `docs/analysis/09_shader_system.md` - 着色器系统分析
+- `docs/analysis/10_editor_architecture.md` - 编辑器架构分析
+- `docs/analysis/11_physics_system.md` - 物理系统分析
+- `docs/analysis/12_animation_system.md` - 动画系统分析
+- `docs/analysis/13_ui_system.md` - UI 系统分析
+- `docs/analysis/14_code_standards.md` - 代码规范总结
+- `docs/homework/intern_assignments.md` - 实习生扩展开发作业

@@ -1,0 +1,380 @@
+{
+  "project": "LitchiEngine",
+  "description": "游戏引擎项目分析任务，最终目标是设计适合 Games101/Games104 实习生的扩展开发作业",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "分析 Core 模块架构",
+      "description": "深入分析 Engine/Source/Runtime/Core/ 模块的架构设计，包括数学库、反射系统、事件系统、窗口管理等。总结代码规范和设计模式。",
+      "steps": [
+        "阅读 Core/Math/ 下的数学类实现 (Vector3, Matrix, Quaternion, BoundingBox, Frustum)",
+        "分析 Meta/Reflection/ 下的 RTTR 反射集成",
+        "理解 Tools/Eventing/ 下的 Event 系统设计",
+        "分析 Window/ 下的窗口和输入管理",
+        "总结 Core 模块的设计模式和代码规范"
+      ],
+      "priority": "high",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/01_core_module.md",
+      "category": "analysis"
+    },
+    {
+      "id": 2,
+      "title": "分析 RHI 抽象层设计",
+      "description": "深入分析 RHI (Render Hardware Interface) 抽象层的设计，理解如何屏蔽不同图形 API 的差异",
+      "steps": [
+        "阅读 RHI_Definitions.h 理解核心枚举和类型定义",
+        "分析 RHI_Device 类的接口设计",
+        "理解 RHI_CommandList 的命令录制机制",
+        "分析 RHI_PipelineState 和 RHI_Descriptor 的设计",
+        "总结 RHI 层的抽象原则和设计模式"
+      ],
+      "priority": "high",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/02_rhi_abstraction.md",
+      "category": "analysis"
+    },
+    {
+      "id": 3,
+      "title": "分析 Vulkan 后端实现",
+      "description": "深入分析 Vulkan 后端的实现细节，理解 Vulkan API 的使用方式",
+      "steps": [
+        "分析 Vulkan_Device.cpp 的设备初始化流程",
+        "理解 Vulkan_Pipeline.cpp 的管线创建机制",
+        "分析 Vulkan_Shader.cpp 的着色器编译和反射",
+        "理解 Vulkan_CommandList.cpp 的命令录制实现",
+        "总结 Vulkan 后端的关键技术和优化策略"
+      ],
+      "priority": "high",
+      "dependencies": [2],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/03_vulkan_backend.md",
+      "category": "analysis"
+    },
+    {
+      "id": 4,
+      "title": "分析渲染管线实现",
+      "description": "深入分析渲染管线的实现，包括 Forward Pass、Shadow Map、SkyBox、PBR 等",
+      "steps": [
+        "分析 Renderer 类的整体架构",
+        "理解 RendererPath 的渲染路径抽象",
+        "分析 Pass_ShadowMaps 的阴影渲染实现",
+        "分析 Pass_ForwardPass 的前向渲染实现",
+        "理解 PBR 材质系统的实现",
+        "总结渲染管线的流程和优化策略"
+      ],
+      "priority": "high",
+      "dependencies": [2, 3],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/04_rendering_pipeline.md",
+      "category": "analysis"
+    },
+    {
+      "id": 5,
+      "title": "分析脚本系统架构",
+      "description": "深入分析 Mono/C# 脚本系统的架构设计和实现",
+      "steps": [
+        "分析 ScriptEngine 的初始化流程",
+        "理解 ScriptClass 和 ScriptInstance 的设计",
+        "分析 C++ 与 C# 的互操作机制 (InternalCalls)",
+        "理解 ScriptObject 的对象映射机制",
+        "总结脚本系统的设计模式和最佳实践"
+      ],
+      "priority": "high",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/05_script_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 6,
+      "title": "分析组件系统架构",
+      "description": "深入分析 GameObject-Component 组件系统的架构设计",
+      "steps": [
+        "分析 GameObject 类的设计和生命周期管理",
+        "理解 Component 基类的设计和生命周期回调",
+        "分析 Transform 组件的层级管理实现",
+        "理解 MeshRenderer 组件的渲染集成",
+        "总结组件系统的设计模式和扩展方式"
+      ],
+      "priority": "high",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/06_component_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 7,
+      "title": "分析场景管理系统",
+      "description": "深入分析场景管理系统和序列化机制",
+      "steps": [
+        "分析 Scene 类的设计和职责",
+        "理解 SceneManager 的场景加载/卸载流程",
+        "分析场景序列化和反序列化机制",
+        "理解 Prefab 预制体系统",
+        "总结场景管理的设计模式"
+      ],
+      "priority": "medium",
+      "dependencies": [6],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/07_scene_management.md",
+      "category": "analysis"
+    },
+    {
+      "id": 8,
+      "title": "分析资源管理系统",
+      "description": "深入分析资源管理系统的设计和实现",
+      "steps": [
+        "分析 AResourceManager 模板基类的设计",
+        "理解各类资源管理器 (ModelManager, TextureManager 等) 的实现",
+        "分析 AssetManager 的序列化机制",
+        "理解 Mesh 和 Material 资源的数据结构",
+        "总结资源管理的设计模式和最佳实践"
+      ],
+      "priority": "medium",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/08_resource_management.md",
+      "category": "analysis"
+    },
+    {
+      "id": 9,
+      "title": "分析着色器系统",
+      "description": "深入分析着色器系统，包括 HLSL 着色器和 DXCompiler 编译流程",
+      "steps": [
+        "阅读 common_buffers.hlsl 理解常量缓冲区布局",
+        "分析 PBRTest.hlsl 理解 PBR 材质实现",
+        "理解 ShadowMap.hlsl 的阴影渲染实现",
+        "分析 DXCompiler 的编译参数和 SPIR-V 生成",
+        "总结着色器系统的设计规范"
+      ],
+      "priority": "medium",
+      "dependencies": [4],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/09_shader_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 10,
+      "title": "分析编辑器架构",
+      "description": "深入分析编辑器的架构设计和 ImGui 集成",
+      "steps": [
+        "分析 EditorApplication 的初始化流程",
+        "理解编辑器窗口系统的设计",
+        "分析 Inspector、Hierarchy、Project 等面板的实现",
+        "理解编辑器与运行时的交互机制",
+        "总结编辑器的设计模式和扩展方式"
+      ],
+      "priority": "medium",
+      "dependencies": [],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/10_editor_architecture.md",
+      "category": "analysis"
+    },
+    {
+      "id": 11,
+      "title": "分析物理系统",
+      "description": "深入分析 PhysX 物理系统的集成和使用",
+      "steps": [
+        "分析物理引擎的初始化流程",
+        "理解 RigidActor、Collider 等组件的设计",
+        "分析物理模拟和碰撞检测机制",
+        "理解物理事件的处理方式",
+        "总结物理系统的使用规范"
+      ],
+      "priority": "medium",
+      "dependencies": [6],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/11_physics_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 12,
+      "title": "分析动画系统",
+      "description": "深入分析骨骼动画系统的设计和实现",
+      "steps": [
+        "分析 Animator 组件的设计",
+        "理解骨骼动画数据结构 (BoneInfo, AnimationClip)",
+        "分析动画混合和状态机实现",
+        "理解 SkinnedMeshRenderer 的蒙皮渲染",
+        "总结动画系统的使用规范"
+      ],
+      "priority": "medium",
+      "dependencies": [4, 6],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/12_animation_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 13,
+      "title": "分析 UI 系统",
+      "description": "深入分析 ImGui UI 系统的设计和实现",
+      "steps": [
+        "分析 UI 组件的继承体系",
+        "理解 UICanvas、UIImage、UIText 等组件的设计",
+        "分析 UI 事件处理机制",
+        "理解 UI 渲染流程",
+        "总结 UI 系统的扩展方式"
+      ],
+      "priority": "medium",
+      "dependencies": [6, 10],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/13_ui_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 14,
+      "title": "总结项目代码规范",
+      "description": "基于以上分析，总结项目的代码规范、命名约定、设计模式等",
+      "steps": [
+        "总结命名规范 (类名、变量名、函数名)",
+        "总结代码组织结构",
+        "总结常用的设计模式",
+        "总结组件扩展的标准流程",
+        "总结资源管理的最佳实践"
+      ],
+      "priority": "high",
+      "dependencies": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [],
+      "output_file": "docs/analysis/14_code_standards.md",
+      "category": "analysis"
+    },
+    {
+      "id": 15,
+      "title": "设计实习生引擎原理学习作业",
+      "description": "基于项目分析结果，设计适合 Games101/Games104 实习生的引擎原理学习作业。作业核心目标是让实习生理解引擎系统的实现原理，而非简单的组件开发。",
+      "steps": [
+        "分析实习生已掌握的知识背景 (Games101: 渲染管线、着色器; Games104: 游戏引擎架构)",
+        "根据项目模块分析结果，识别适合学习的引擎系统",
+        "设计作业，每个作业聚焦一个引擎系统",
+        "每个作业采用三层次结构：读源码 → 回答问题 → 小修改验证",
+        "确保作业覆盖核心系统：组件系统、Transform系统、物理系统、渲染系统等",
+        "编写作业文档，包含源码路径、关键问题、验证方法"
+      ],
+      "priority": "high",
+      "dependencies": [14],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "作业侧重引擎原理而非组件使用",
+        "作业引导阅读源码理解实现",
+        "作业有明确的原理问题",
+        "作业有小修改验证理解"
+      ],
+      "output_file": "docs/homework/intern_assignments.md",
+      "category": "design",
+      "design_principles": {
+        "core_philosophy": "不是'用引擎写功能'，而是'理解引擎是怎么实现的'",
+        "comparison": {
+          "unity_style": {
+            "approach": "写组件代码，调用 API，实现游戏功能",
+            "focus": "怎么用"
+          },
+          "engine_principle_style": {
+            "approach": "读引擎源码，理解实现原理，验证理解",
+            "focus": "为什么这样设计"
+          }
+        },
+        "assignment_structure": {
+          "layer_1": {
+            "name": "读源码",
+            "description": "阅读引擎源码，理解系统实现",
+            "action": "阅读指定文件，理解关键代码"
+          },
+          "layer_2": {
+            "name": "回答问题",
+            "description": "回答原理性问题，验证理解",
+            "action": "回答为什么这样设计、如何实现等问题"
+          },
+          "layer_3": {
+            "name": "小修改验证",
+            "description": "修改代码验证理解是否正确",
+            "action": "添加日志、修改参数、观察变化"
+          }
+        },
+        "example_topics": [
+          {
+            "system": "组件系统",
+            "source_files": ["GameObject.cpp", "Component.h"],
+            "questions": [
+              "组件列表为什么用 std::vector 存储？",
+              "生命周期回调是如何调度的？",
+              "RTTR 反射是如何注册组件的？"
+            ],
+            "verification": "添加计数器统计每帧调用多少组件的 OnUpdate"
+          },
+          {
+            "system": "Transform系统",
+            "source_files": ["Transform.cpp", "Matrix.h"],
+            "questions": [
+              "SetPosition 后矩阵是如何更新的？",
+              "世界坐标和本地坐标如何转换？",
+              "父子层级如何影响变换？"
+            ],
+            "verification": "打印矩阵值，观察父子关系变化时矩阵如何改变"
+          },
+          {
+            "system": "物理系统",
+            "source_files": ["Physics.cpp", "Collider.cpp"],
+            "questions": [
+              "引擎如何封装 PhysX？",
+              "RaycastSingle 是如何实现的？",
+              "碰撞事件如何传回组件？"
+            ],
+            "verification": "修改射线参数，观察返回值变化"
+          }
+        ],
+        "learning_value": [
+          "理解引擎架构设计",
+          "学习 C++ 工程实践",
+          "为后续扩展引擎打下基础"
+        ]
+      }
+    }
+  ]
+}
