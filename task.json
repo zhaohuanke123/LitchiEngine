@@ -430,6 +430,45 @@
       ],
       "output_file": "docs/homework/catlike_style_tutorials.md",
       "category": "design"
+    {
+      "id": 18,
+      "title": "重新设计引擎原理学习教程",
+      "description": "重新设计教程，核心目标是通过实践学习引擎原理和源码。保留 Catlike Coding 风格（渐进式、问题驱动），但每个步骤都要引导读源码、理解'为什么这样设计'、'是怎么实现的'。",
+      "steps": [
+        "回顾 Catlike Coding 风格调研报告",
+        "分析现有教程的问题：代码直接给出，缺少读源码环节",
+        "重新设计教程结构：读源码 → 理解原理 → 实践验证",
+        "每个教程聚焦一个引擎系统的实现原理",
+        "设计引导性问题：为什么这样设计？是怎么实现的？",
+        "代码作为验证理解的手段，而非复制粘贴的目标"
+      ],
+      "priority": "high",
+      "dependencies": [16],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "教程必须引导读引擎源码",
+        "问题必须围绕'为什么这样设计'",
+        "实践是验证理解的手段",
+        "不是教怎么用，而是教怎么实现的"
+      ],
+      "output_file": "docs/homework/engine_principle_tutorials.md",
+      "category": "design",
+      "design_principles": {
+        "core_philosophy": "通过实践加功能，学习引擎是怎么实现的",
+        "style": "Catlike Coding 风格（渐进式、问题驱动）",
+        "structure": {
+          "step_1": "读源码 - 引导阅读引擎关键代码",
+          "step_2": "理解原理 - 回答为什么这样设计",
+          "step_3": "实践验证 - 添加功能验证理解"
+        },
+        "key_questions": [
+          "这段代码为什么这样写？",
+          "引擎是怎么实现这个功能的？",
+          "如果我要添加功能，需要理解什么？"
+        ]
+      }
     }
   ]
 }
