@@ -54,7 +54,9 @@
         "总结 Vulkan 后端的关键技术和优化策略"
       ],
       "priority": "high",
-      "dependencies": [2],
+      "dependencies": [
+        2
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -75,7 +77,10 @@
         "总结渲染管线的流程和优化策略"
       ],
       "priority": "high",
-      "dependencies": [2, 3],
+      "dependencies": [
+        2,
+        3
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -135,7 +140,9 @@
         "总结场景管理的设计模式"
       ],
       "priority": "medium",
-      "dependencies": [6],
+      "dependencies": [
+        6
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -175,7 +182,9 @@
         "总结着色器系统的设计规范"
       ],
       "priority": "medium",
-      "dependencies": [4],
+      "dependencies": [
+        4
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -215,7 +224,9 @@
         "总结物理系统的使用规范"
       ],
       "priority": "medium",
-      "dependencies": [6],
+      "dependencies": [
+        6
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -235,7 +246,10 @@
         "总结动画系统的使用规范"
       ],
       "priority": "medium",
-      "dependencies": [4, 6],
+      "dependencies": [
+        4,
+        6
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -255,7 +269,10 @@
         "总结 UI 系统的扩展方式"
       ],
       "priority": "medium",
-      "dependencies": [6, 10],
+      "dependencies": [
+        6,
+        10
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -275,7 +292,21 @@
         "总结资源管理的最佳实践"
       ],
       "priority": "high",
-      "dependencies": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "dependencies": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -296,7 +327,9 @@
         "编写作业文档，包含源码路径、关键问题、验证方法"
       ],
       "priority": "high",
-      "dependencies": [14],
+      "dependencies": [
+        14
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -340,7 +373,10 @@
         "example_topics": [
           {
             "system": "组件系统",
-            "source_files": ["GameObject.cpp", "Component.h"],
+            "source_files": [
+              "GameObject.cpp",
+              "Component.h"
+            ],
             "questions": [
               "组件列表为什么用 std::vector 存储？",
               "生命周期回调是如何调度的？",
@@ -350,7 +386,10 @@
           },
           {
             "system": "Transform系统",
-            "source_files": ["Transform.cpp", "Matrix.h"],
+            "source_files": [
+              "Transform.cpp",
+              "Matrix.h"
+            ],
             "questions": [
               "SetPosition 后矩阵是如何更新的？",
               "世界坐标和本地坐标如何转换？",
@@ -360,7 +399,10 @@
           },
           {
             "system": "物理系统",
-            "source_files": ["Physics.cpp", "Collider.cpp"],
+            "source_files": [
+              "Physics.cpp",
+              "Collider.cpp"
+            ],
             "questions": [
               "引擎如何封装 PhysX？",
               "RaycastSingle 是如何实现的？",
@@ -418,7 +460,9 @@
         "添加扩展挑战和进阶内容"
       ],
       "priority": "high",
-      "dependencies": [16],
+      "dependencies": [
+        16
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",
@@ -430,6 +474,7 @@
       ],
       "output_file": "docs/homework/catlike_style_tutorials.md",
       "category": "design"
+    },
     {
       "id": 18,
       "title": "重新设计引擎原理学习教程",
@@ -443,7 +488,9 @@
         "代码作为验证理解的手段，而非复制粘贴的目标"
       ],
       "priority": "high",
-      "dependencies": [16],
+      "dependencies": [
+        16
+      ],
       "passes": true,
       "blocked": false,
       "blocked_reason": "",

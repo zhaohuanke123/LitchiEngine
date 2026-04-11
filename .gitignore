@@ -59,3 +59,5 @@ bld/
 Tools/easy_profiler-v2.1.0-msvc15-win64
 /DemoProject/
 
+.claude/
+.specstory/
