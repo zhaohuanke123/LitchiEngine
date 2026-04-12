@@ -21,15 +21,23 @@ if(MSVC)
     # 启用并行编译
     add_compile_options("/MP")
 
-    # 根据构建类型设置编译选项
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        # 在Debug模式下使用多线程调试DLL (/MTd)
-        add_compile_options("/MTd")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        # 在Release模式下使用多线程DLL (/MT)
-        add_compile_options("/MT")
+    # 对于多配置生成器 (Visual Studio)，使用生成器表达式
+    # 对于单配置生成器 (Ninja, Makefile)，使用 CMAKE_BUILD_TYPE
+    if(CMAKE_CONFIGURATION_TYPES)
+        # Visual Studio 多配置生成器
+        add_compile_options(
+            "$<$<CONFIG:Debug>:/MTd>"
+            "$<$<CONFIG:Release>:/MT>"
+        )
     else()
-        message("Unknown build type: ${CMAKE_BUILD_TYPE}")
+        # 单配置生成器
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            add_compile_options("/MTd")
+        elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+            add_compile_options("/MT")
+        else()
+            message("Unknown build type: ${CMAKE_BUILD_TYPE}")
+        endif()
     endif()
 endif()
 
