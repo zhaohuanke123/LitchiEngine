@@ -17,17 +17,16 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}../../../" FILES ${rttr_cpp})
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}../../../" FILES ${GLAD_FILES})
 source_group(TREE "${ENGINE_ASSET_DIR}/Engine/" FILES ${SHADER_FILES})
 
-# 根据不同的构建模式添加特定的宏
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_definitions(_DEBUG)
-	add_compile_definitions(PX_PHYSX_STATIC_LIB)
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_definitions(NDEBUG)
-	add_compile_definitions(PX_PHYSX_STATIC_LIB)
-endif()
-
 # 添加目标库
 add_library(${TARGET_NAME} ${rttr_cpp} ${GLAD_FILES} ${HEADER_FILES} ${SOURCE_FILES} ${SHADER_FILES})
+
+# 根据不同的构建模式添加特定的宏
+# 使用生成器表达式支持多配置生成器 (Visual Studio)
+target_compile_definitions(${TARGET_NAME} PUBLIC
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:Release>:NDEBUG>
+    PX_PHYSX_STATIC_LIB
+)
 
 # 设置shaders不参与项目编译
 # https://cmake.org/pipermail/cmake/2008-June/022387.html
@@ -35,17 +34,17 @@ set_source_files_properties(${SHADER_FILES} PROPERTIES HEADER_FILE_ONLY TRUE)
 
 # 设置Target工程 C++17版本
 set_target_properties(${TARGET_NAME} PROPERTIES CXX_STANDARD 17)
-# 将Target工程添加到目录Engine目录下 
+# 将Target工程添加到目录Engine目录下
 set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "Engine")
 
 # being a cross-platform target, we enforce standards conformance on MSVC
-target_compile_options(${TARGET_NAME} 
+target_compile_options(${TARGET_NAME}
 	PUBLIC "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/WX->"
-	PRIVATE 
-	$<$<CXX_COMPILER_ID:MSVC>:/bigobj> 
+	PRIVATE
+	$<$<CXX_COMPILER_ID:MSVC>:/bigobj>
 	$<$<CXX_COMPILER_ID:GNU>:-Wa,-mbig-obj>)
-	
-# Link dependencies    
+
+# Link dependencies
 target_link_libraries(${TARGET_NAME} PUBLIC spdlog)
 target_link_libraries(${TARGET_NAME} PUBLIC glfw)
 target_link_libraries(${TARGET_NAME} PUBLIC stb)

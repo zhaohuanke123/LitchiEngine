@@ -1542,11 +1542,11 @@ namespace LitchiRuntime
 		// GPU limits (m_max_descriptor_set_*) are used as safety caps, not allocation targets.
 
 		constexpr uint32_t per_set_samplers = 32;
-		constexpr uint32_t per_set_textures = 16536;  // For bindless texture arrays
-		constexpr uint32_t per_set_storage_images = 16536;
+		constexpr uint32_t per_set_textures = 2048;  // For bindless texture arrays
+		constexpr uint32_t per_set_storage_images = 256;
 		constexpr uint32_t per_set_ubo = 32;
 		constexpr uint32_t per_set_ssbo = 32;
-		constexpr uint32_t max_sets = 4098;
+		constexpr uint32_t max_sets = 256;
 
 		// Use GPU limits as safety caps
 		uint32_t pool_samplers = std::min(per_set_samplers, m_max_descriptor_set_samplers) * max_sets;
