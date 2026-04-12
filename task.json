@@ -516,6 +516,50 @@
           "如果我要添加功能，需要理解什么？"
         ]
       }
+    },
+    {
+      "id": 19,
+      "title": "分析编辑器运行模式状态机",
+      "description": "深入分析编辑器的操作流程，特别是 Play 按钮按下后的逻辑和状态变化。理解编辑器如何在 Edit/Play/Pause 模式之间切换，以及场景、脚本、组件在这些模式下的行为差异。",
+      "steps": [
+        "分析 EditorActions 中的播放控制逻辑 (Play/Pause/Stop)",
+        "理解编辑器状态机设计：状态定义、状态转换、状态事件",
+        "分析场景在播放模式下的行为：场景复制、运行时修改、状态恢复",
+        "理解脚本在播放模式下的生命周期：OnAwake/OnStart/OnUpdate 的调用时机",
+        "分析暂停模式：如何冻结游戏逻辑、如何单步执行",
+        "分析停止播放后的状态恢复：场景回滚、对象销毁、资源清理",
+        "总结编辑器运行模式的设计模式和最佳实践"
+      ],
+      "priority": "high",
+      "dependencies": [
+        10
+      ],
+      "passes": false,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "需分析 EditorActions 类的播放控制方法",
+        "需理解 ApplicationEditor 的状态管理",
+        "需分析场景在运行时的复制机制",
+        "需理解脚本生命周期的触发时机"
+      ],
+      "output_file": "docs/analysis/16_editor_play_mode.md",
+      "category": "analysis",
+      "key_questions": [
+        "Play 按钮按下后发生了什么？",
+        "编辑器模式和运行模式有什么区别？",
+        "场景是如何被复制和恢复的？",
+        "暂停时游戏逻辑是如何被冻结的？",
+        "停止后场景是如何回滚的？"
+      ],
+      "passes": true,
+      "validation_notes": [
+        "分析文档已生成: docs/analysis/16_editor_play_mode.md",
+        "覆盖了编辑器状态机设计",
+        "覆盖了 Play/Pause/Stop 流程",
+        "覆盖了组件生命周期触发时机",
+        "覆盖了场景备份恢复机制"
+      ]
     }
   ]
 }

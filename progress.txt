@@ -345,6 +345,35 @@
 
 ---
 
+## [2026-04-12] - Task #19: 分析编辑器运行模式状态机
+
+### What was done:
+- 分析了 EditorActions 类的播放控制逻辑：StartPlaying、PauseGame、StopPlaying、NextFrame
+- 分析了编辑器状态机设计：EEditorMode 枚举 (EDIT, PLAY, PAUSE, FRAME_BY_FRAME)
+- 分析了场景在播放模式下的行为：
+  - 场景备份机制：播放前序列化为 JSON，停止时反序列化恢复
+  - Scene::Play() 方法：唤醒 GameObject，调用 OnAwake → OnEnable → OnStart
+- 分析了组件生命周期触发时机：
+  - OnAwake/OnEnable/OnStart 在 Scene::Play() 中调用
+  - OnUpdate/OnFixedUpdate/OnLateUpdate 在主循环中调用
+  - OnDisable/OnDestroy 在停止或销毁时调用
+- 分析了暂停和停止模式：
+  - 暂停模式：不调用 scene->Update()，游戏逻辑冻结
+  - 停止模式：从备份恢复场景，切换到 EDIT 模式
+- 分析了渲染路径切换：SceneView 和 GameView 独立渲染路径
+- 分析了 Toolbar 按钮状态管理：根据 EditorMode 更新按钮启用状态
+
+### Testing:
+- 文档输出: docs/analysis/16_editor_play_mode.md
+
+### Notes:
+- 编辑器使用备忘录模式实现场景备份恢复
+- 组件生命周期通过 m_awaked、m_started、m_sleeping 标志控制
+- EditorModeChangedEvent 事件通知各模块状态变化
+- 暂停功能 (PauseGame) 当前实现为空，未完全实现
+
+---
+
 ## 已完成任务
 
 ### 分析任务 (Analysis Tasks)
