@@ -170,30 +170,20 @@ namespace LitchiRuntime
     {
         // 暂时什么都不做
     }
-
-    // RTTR 注册
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<RotateComponent>("RotateComponent")
-            .constructor<>();
-    }
 }
 ```
 
-**RTTR 注册说明**：
+**注意**：RTTR 注册不放在这里，而是统一放在 `TypeRegister.h` 中。
 
-| 代码 | 作用 |
-|------|------|
-| `RTTR_REGISTRATION` | 注册块开始 |
-| `class_<RotateComponent>("RotateComponent")` | 注册类，指定名称 |
-| `.constructor<>()` | 注册默认构造函数 |
+### 第四步：在 TypeRegister.h 中注册
 
-### 第四步：添加到构建系统
+**文件路径**: `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h`
 
-修改 `Engine/Source/Runtime/CMakeLists.txt`，在源文件列表中添加：
+在 `Framework Object Types` 区域添加：
 
-```cmake
-Function/Framework/Component/Gameplay/RotateComponent.cpp
+```cpp
+rttr::registration::class_<RotateComponent>("RotateComponent")
+    .constructor<>()(rttr::policy::ctor::as_raw_ptr);
 ```
 
 **验证**: 重新编译项目，应该成功通过。此时组件已可在编辑器中使用，但还没有功能。
@@ -246,12 +236,6 @@ namespace LitchiRuntime
         if (!transform) return;
 
         // TODO: 实现旋转
-    }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<RotateComponent>("RotateComponent")
-            .constructor<>();
     }
 }
 ```
@@ -320,13 +304,6 @@ namespace LitchiRuntime
         // 应用旋转
         transform->SetRotationLocal(currentRot * deltaRot);
     }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<RotateComponent>("RotateComponent")
-            .constructor<>()
-            .property("rotationSpeed", &RotateComponent::rotationSpeed);
-    }
 }
 ```
 
@@ -345,16 +322,38 @@ namespace LitchiRuntime
 
 ### 第八步：注册属性到 RTTR
 
-注意 RTTR 注册中的变化：
+**重要**：LitchiEngine 的 RTTR 注册统一放在 `TypeRegister.h` 中，而不是每个组件的 cpp 文件。
+
+**文件路径**: `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h`
+
+找到 `Framework Object Types` 区域，添加注册：
 
 ```cpp
-RTTR_REGISTRATION
-{
-    rttr::registration::class_<RotateComponent>("RotateComponent")
-        .constructor<>()
-        .property("rotationSpeed", &RotateComponent::rotationSpeed);  // 新增
-};
+rttr::registration::class_<RotateComponent>("RotateComponent")
+    .constructor<>()(rttr::policy::ctor::as_raw_ptr)
+    .property("rotationSpeed", &RotateComponent::rotationSpeed);
 ```
+
+**为什么放在 TypeRegister.h？**
+
+| 原因 | 说明 |
+|------|------|
+| 集中管理 | 所有组件注册在一处，便于维护 |
+| 编译优化 | 减少编译单元，加快编译速度 |
+| 依赖清晰 | 避免循环依赖问题 |
+
+**as_raw_ptr 策略说明**：
+
+| 策略 | 创建方式 | 适用场景 |
+|------|----------|----------|
+| 默认（无策略） | 栈对象 | 不适合引擎组件 |
+| `as_raw_ptr` | 原始指针（堆） | **引擎组件必须** |
+
+**如果不使用 as_raw_ptr 会怎样？**
+
+场景序列化/反序列化时会崩溃：
+1. Play → Stop 切换时场景恢复失败
+2. Prefab 实例化时组件创建失败
 
 `.property()` 让编辑器能在 Inspector 面板中显示和编辑这个属性。
 
@@ -381,39 +380,14 @@ RTTR_REGISTRATION
 
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
-| 组件不显示在列表中 | RTTR 注册失败 | 检查 RTTR_REGISTRATION 块 |
+| 组件不显示在列表中 | RTTR 注册失败 | 检查 TypeRegister.h 中的注册 |
 | 物体不旋转 | OnUpdate 未被调用 | 检查 GameObject 是否激活 |
 | 旋转速度异常 | deltaTime 问题 | 确认 Time::GetDeltaTime() 正常 |
+| Play/Stop 崩溃 | 缺少 as_raw_ptr | 添加 `(rttr::policy::ctor::as_raw_ptr)` |
+| 组件属性不显示 | 未注册 property | 添加 `.property("name", &Class::member)` |
 
 ---
 
-## 练习
-
-### 1. 基础练习：多轴旋转
-
-修改代码，让物体同时绕 X、Y、Z 轴旋转。
-
-**提示**：需要分别计算三个轴的增量旋转，然后组合它们。
-
-### 2. 进阶练习：变速旋转
-
-添加一个 `speedMultiplier` 属性，可以在运行时调整旋转速度。
-
-```cpp
-// 添加到类定义中
-float speedMultiplier = 1.0f;
-
-// 在 OnUpdate 中使用
-float effectiveSpeed = rotationSpeed.y * speedMultiplier;
-```
-
-### 3. 挑战：PingPong 旋转
-
-让物体在两个角度之间来回摆动，而不是持续旋转。
-
-**提示**：使用 `sin(time)` 函数或记录累计时间。
-
----
 
 ## 验证标准
 
@@ -423,6 +397,7 @@ float effectiveSpeed = rotationSpeed.y * speedMultiplier;
 - [ ] Inspector 中显示 rotationSpeed 属性
 - [ ] 运行时物体正确旋转
 - [ ] 修改属性值能影响旋转行为
+- [ ] Play/Stop 切换不崩溃（as_raw_ptr 正确配置）
 
 ---
 
@@ -436,7 +411,8 @@ float effectiveSpeed = rotationSpeed.y * speedMultiplier;
 | OnUpdate() | 每帧调用的方法，用于实现游戏逻辑 |
 | Transform | 控制物体的位置、旋转、缩放 |
 | Quaternion | 表示旋转，避免万向锁 |
-| RTTR 注册 | 让编辑器识别组件和属性 |
+| RTTR 注册 | 在 TypeRegister.h 中统一注册，让编辑器识别组件 |
+| as_raw_ptr | RTTR 构造策略，组件必须使用 |
 | Time::GetDeltaTime() | 帧无关动画的关键 |
 
 ---
