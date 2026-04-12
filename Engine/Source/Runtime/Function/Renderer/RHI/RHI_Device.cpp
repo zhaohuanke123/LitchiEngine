@@ -26,6 +26,13 @@ namespace LitchiRuntime
     uint32_t RHI_Device::m_max_shading_rate_texel_size_y = 0;
     bool RHI_Device::m_is_shading_rate_supported = false;
 
+    // Descriptor limits (from GPU)
+    uint32_t RHI_Device::m_max_descriptor_set_samplers = 0;
+    uint32_t RHI_Device::m_max_descriptor_set_sampled_images = 0;
+    uint32_t RHI_Device::m_max_descriptor_set_storage_images = 0;
+    uint32_t RHI_Device::m_max_descriptor_set_uniform_buffers_dynamic = 0;
+    uint32_t RHI_Device::m_max_descriptor_set_storage_buffers_dynamic = 0;
+
     // Misc
     bool RHI_Device::m_wide_lines                          = false;
     uint32_t  RHI_Device::m_physical_device_index          = 0;

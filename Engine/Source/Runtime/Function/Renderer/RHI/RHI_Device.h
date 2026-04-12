@@ -134,6 +134,13 @@ namespace LitchiRuntime
 		static uint32_t m_max_shading_rate_texel_size_y ;
 		static bool m_is_shading_rate_supported ;
 
+		// Descriptor limits (from GPU)
+		static uint32_t m_max_descriptor_set_samplers;
+		static uint32_t m_max_descriptor_set_sampled_images;
+		static uint32_t m_max_descriptor_set_storage_images;
+		static uint32_t m_max_descriptor_set_uniform_buffers_dynamic;
+		static uint32_t m_max_descriptor_set_storage_buffers_dynamic;
+
 		// Misc
 		static bool m_wide_lines;
 		static uint32_t m_physical_device_index;

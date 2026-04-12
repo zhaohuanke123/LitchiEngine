@@ -1050,6 +1050,13 @@ namespace LitchiRuntime
 				m_max_shading_rate_texel_size_x = shading_rate_properties.maxFragmentShadingRateAttachmentTexelSize.width;
 				m_max_shading_rate_texel_size_y = shading_rate_properties.maxFragmentShadingRateAttachmentTexelSize.height;
 
+				// Save descriptor limits
+				m_max_descriptor_set_samplers = properties_device.properties.limits.maxDescriptorSetSamplers;
+				m_max_descriptor_set_sampled_images = properties_device.properties.limits.maxDescriptorSetSampledImages;
+				m_max_descriptor_set_storage_images = properties_device.properties.limits.maxDescriptorSetStorageImages;
+				m_max_descriptor_set_uniform_buffers_dynamic = properties_device.properties.limits.maxDescriptorSetUniformBuffersDynamic;
+				m_max_descriptor_set_storage_buffers_dynamic = properties_device.properties.limits.maxDescriptorSetStorageBuffersDynamic;
+
 				// Disable profiler if timestamps are not supported
 				if (RHI_Context::gpu_profiling)
 				{
@@ -1522,13 +1529,46 @@ namespace LitchiRuntime
 
 	void RHI_Device::CreateDescriptorPool()
 	{
+		// Descriptor pool sizing strategy:
+		// The formula pool_size = per_set_count Ã— max_sets is correct.
+		// The original bug was using rhi_max_array_size (16384) as per_set_count,
+		// which is the bindless array limit, NOT the actual per-set descriptor count.
+		//
+		// Different descriptor types have different usage patterns:
+		// - Samplers: Few per set (engine uses shared bindless samplers)
+		// - Textures: Many for bindless rendering, but not every set needs maximum
+		// - Dynamic buffers: Few per set (UBO/SSBO for per-frame data)
+		//
+		// GPU limits (m_max_descriptor_set_*) are used as safety caps, not allocation targets.
+
+		constexpr uint32_t per_set_samplers = 32;
+		constexpr uint32_t per_set_textures = 16536;  // For bindless texture arrays
+		constexpr uint32_t per_set_storage_images = 16536;
+		constexpr uint32_t per_set_ubo = 32;
+		constexpr uint32_t per_set_ssbo = 32;
+		constexpr uint32_t max_sets = 4098;
+
+		// Use GPU limits as safety caps
+		uint32_t pool_samplers = std::min(per_set_samplers, m_max_descriptor_set_samplers) * max_sets;
+		uint32_t pool_textures = std::min(per_set_textures, m_max_descriptor_set_sampled_images) * max_sets;
+		uint32_t pool_storage_images = std::min(per_set_storage_images, m_max_descriptor_set_storage_images) * max_sets;
+		uint32_t pool_ubo = std::min(per_set_ubo, m_max_descriptor_set_uniform_buffers_dynamic) * max_sets;
+		uint32_t pool_ssbo = std::min(per_set_ssbo, m_max_descriptor_set_storage_buffers_dynamic) * max_sets;
+
+		// Log descriptor limits for debugging
+		DEBUG_LOG_INFO("GPU Descriptor Limits: samplers={}, sampled_images={}, storage_images={}, uniform_dynamic={}, storage_dynamic={}",
+			m_max_descriptor_set_samplers, m_max_descriptor_set_sampled_images, m_max_descriptor_set_storage_images,
+			m_max_descriptor_set_uniform_buffers_dynamic, m_max_descriptor_set_storage_buffers_dynamic);
+		DEBUG_LOG_INFO("Pool sizes: samplers={}, sampled_images={}, storage_images={}, uniform_dynamic={}, storage_dynamic={}, max_sets={}",
+			pool_samplers, pool_textures, pool_storage_images, pool_ubo, pool_ssbo, max_sets);
+
 		static array<VkDescriptorPoolSize, 5> pool_sizes =
 		{
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER,                rhi_max_array_size * rhi_max_descriptor_set_count },
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          rhi_max_array_size * rhi_max_descriptor_set_count },
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          rhi_max_array_size * rhi_max_descriptor_set_count },
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, rhi_max_array_size * rhi_max_descriptor_set_count }, // structured buffer
-			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, rhi_max_array_size * rhi_max_descriptor_set_count }
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER,                pool_samplers },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          pool_textures },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          pool_storage_images },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, pool_ssbo },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, pool_ubo }
 		};
 
 		// describe
@@ -1537,7 +1577,7 @@ namespace LitchiRuntime
 		pool_create_info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
 		pool_create_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
 		pool_create_info.pPoolSizes = pool_sizes.data();
-		pool_create_info.maxSets = rhi_max_descriptor_set_count;
+		pool_create_info.maxSets = max_sets;
 
 		// create
 		LC_ASSERT(descriptors::descriptor_pool == nullptr);
@@ -1762,7 +1802,7 @@ namespace LitchiRuntime
 		buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		buffer_create_info.size = size;
 		buffer_create_info.usage = usage;
-		buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // ¶ÀÕ¼
+		buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // ï¿½ï¿½Õ¼
 
 		// Allocation info
 		VmaAllocationCreateInfo allocation_create_info = {};
