@@ -145,7 +145,10 @@ namespace LitchiRuntime
         RHI_Texture* tex_depth = rendererLightGroup.m_texture_depth.get();
         RHI_Texture* tex_color = rendererLightGroup.m_texture_color.get();
         if (!tex_depth)
+        {
+            cmd_list->EndTimeblock();
             return;
+        }
 
         pso.render_target_color_textures[0] = tex_color; // always bind so we can clear to white (in case there are no transparent objects)
         pso.render_target_depth_texture = tex_depth;
@@ -369,7 +372,7 @@ namespace LitchiRuntime
             RHI_IndexBuffer* index_buffer = mesh->GetIndexBuffer();
 
             if (!mesh || !vertex_buffer || !index_buffer)
-                return;
+                continue;
 
             // Acquire material
             Material* material = meshRenderer->GetMaterial();

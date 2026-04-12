@@ -5,6 +5,7 @@
 #include <easy/profiler.h>
 #include <easy/details/profiler_colors.h>
 
+#include "Runtime/Core/Log/debug.h"
 #include "Runtime/Function/Framework/Component/Camera/camera.h"
 #include "Runtime/Function/Framework/Component/Light/Light.h"
 #include "Runtime/Function/Framework/Component/Renderer/MeshRenderer.h"
@@ -78,9 +79,10 @@ namespace LitchiRuntime
 
 	bool RendererPath::HasRenderable(Renderer_Entity rendererEntity)
 	{
-		if (this->m_renderables.find(rendererEntity) != m_renderables.end())
+		auto it = this->m_renderables.find(rendererEntity);
+		if (it != m_renderables.end())
 		{
-			return true;
+			return !it->second.empty();  // 检查 vector 是否非空
 		}
 
 		return false;
@@ -260,12 +262,21 @@ namespace LitchiRuntime
 		if (!CheckIsBuildInRendererCamera() && HasRenderable(Renderer_Entity::Camera))
 		{
 			auto cameraObject = m_renderables[Renderer_Entity::Camera][0];
+			if (!cameraObject) {
+				DEBUG_LOG_ERROR("RendererPath::Update: cameraObject is nullptr!");
+				return;
+			}
 			auto camera = cameraObject->GetComponent<Camera>();
+			if (!camera) {
+				DEBUG_LOG_ERROR("RendererPath::Update: camera component is nullptr!");
+				return;
+			}
 			SetRenderCamera(camera->GetRenderCamera());
 		}
 
-		// Sort
-		FrustumCullAndSort(m_renderables[Renderer_Entity::Mesh]);
+		if (m_renderCamera) {
+			FrustumCullAndSort(m_renderables[Renderer_Entity::Mesh]);
+		}
 
 		UpdateLight();
 	}
