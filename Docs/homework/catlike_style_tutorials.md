@@ -359,7 +359,60 @@ rttr::registration::class_<RotateComponent>("RotateComponent")
 
 ---
 
-## 第四节：测试与验证
+## 第五节：在 Inspector 中注册组件
+
+### 问题：组件如何出现在 "Add Component" 列表中？
+
+RTTR 注册让组件可被序列化，但还需要在 Inspector 面板中添加入口。
+
+### 第九步：添加头文件引用
+
+**文件路径**: `Engine/Source/Editor/source/Panels/Inspector.cpp`
+
+在文件顶部的 include 区域添加：
+
+```cpp
+#include "Runtime/Function/Framework/Component/Gameplay/RotateComponent.h"
+```
+
+### 第十步：添加组件选择器选项
+
+找到 `componentSelectorWidget.choices` 的定义位置（约第 69 行），添加：
+
+```cpp
+componentSelectorWidget.choices.emplace(18, "RotateComponent");
+```
+
+**注意**：数字 18 是选项的索引，确保不与已有索引重复。
+
+### 第十一步：添加组件创建逻辑
+
+在 `addComponentButton.ClickedEvent` 的 switch 语句中添加：
+
+```cpp
+case 18: GetTargetActor()->AddComponent<RotateComponent>(); break;
+```
+
+### 第十二步：添加按钮状态检查
+
+在 `componentSelectorWidget.ValueChangedEvent` 的 switch 语句中添加：
+
+```cpp
+case 18: defineButtonsStates(GetTargetActor()->GetComponent<RotateComponent>()); return;
+```
+
+**完整修改位置**：
+
+| 位置 | 作用 |
+|------|------|
+| 头文件 include | 让编译器知道 RotateComponent 类型 |
+| choices.emplace | 在下拉列表中显示选项 |
+| switch case (ClickedEvent) | 点击按钮时创建组件 |
+| switch case (ValueChangedEvent) | 检查组件是否已存在，禁用按钮 |
+
+---
+
+## 第六节：测试与验证
 
 ### 测试步骤
 
@@ -414,1181 +467,142 @@ rttr::registration::class_<RotateComponent>("RotateComponent")
 | RTTR 注册 | 在 TypeRegister.h 中统一注册，让编辑器识别组件 |
 | as_raw_ptr | RTTR 构造策略，组件必须使用 |
 | Time::GetDeltaTime() | 帧无关动画的关键 |
+| Inspector 注册 | 在 Inspector.cpp 中添加组件到下拉列表 |
+
+### 创建新组件的完整流程
+
+1. **创建头文件** - 继承 Component，添加 RTTR_ENABLE
+2. **创建实现文件** - 实现生命周期方法
+3. **RTTR 注册** - 在 TypeRegister.h 中注册类和属性
+4. **Inspector 注册** - 在 Inspector.cpp 中添加下拉选项和创建逻辑
+5. **编译测试** - 验证组件出现在列表中且功能正常
 
 ---
 
-## 下一步
+## 延伸：C# 脚本 vs C++ 组件
 
-完成本教程后，继续学习：
+### 问题：为什么 C# 脚本不需要手动注册？
 
-**教程 2：向量数学应用 - MovingPlatform**
+你可能注意到，在 Unity 或其他使用 C# 的引擎中，创建脚本只需要：
 
-学习 Vector3 的更多操作，实现物体在两点之间移动。
-
----
-
-# 教程 2：向量数学应用 - MovingPlatform
-
-## 概述
-
-通过创建一个在两点之间来回移动的平台组件，学习：
-
-- Vector3 向量运算
-- 线性插值 (Lerp)
-- 时间控制与动画
-
-**预期成果**：一个能在两点之间平滑移动的 MovingPlatform 组件。
-
-## 前置要求
-
-- 完成教程 1：组件系统入门
-- 理解基本的向量概念
-- 了解插值的概念
-
----
-
-## 第一节：向量基础回顾
-
-### 什么是向量？
-
-在游戏开发中，Vector3 表示三维空间中的点或方向：
-
-```cpp
-Vector3 position(0, 1, 0);    // 位置：原点上方 1 单位
-Vector3 direction(1, 0, 0);   // 方向：指向 X 轴正方向
-```
-
-### 向量运算
-
-LitchiEngine 的 Vector3 支持常见运算：
-
-```cpp
-Vector3 a(1, 2, 3);
-Vector3 b(4, 5, 6);
-
-Vector3 sum = a + b;        // (5, 7, 9)  加法
-Vector3 diff = b - a;       // (3, 3, 3)  减法
-Vector3 scaled = a * 2.0f;  // (2, 4, 6)  标量乘法
-float dist = a.Distance(b); // 距离计算
-```
-
-### 线性插值 (Lerp)
-
-Lerp 是在两个值之间平滑过渡的核心方法：
-
-```cpp
-// Lerp 公式
-result = start + (end - start) * t;
-
-// Vector3::Lerp
-Vector3 result = Vector3::Lerp(pointA, pointB, t);
-```
-
-当 `t = 0` 时，结果是 `pointA`；当 `t = 1` 时，结果是 `pointB`。
-
----
-
-## 第二节：创建基础组件
-
-### 第一步：创建头文件
-
-在 `Gameplay/` 目录创建 `MovingPlatform.h`：
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Math/Vector3.h"
-
-namespace LitchiRuntime
+```csharp
+// C# 脚本 - 不需要注册！
+public class RotateScript : MonoBehaviour
 {
-    class MovingPlatform : public Component
+    public Vector3 rotationSpeed;  // 直接定义，自动显示在 Inspector
+    
+    void Update()
     {
-    public:
-        MovingPlatform() = default;
-        ~MovingPlatform() override = default;
-
-        void OnUpdate() override;
-
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
-### 第二步：创建实现文件
-
-创建 `MovingPlatform.cpp`：
-
-```cpp
-#include "MovingPlatform.h"
-#include "Runtime/Function/Framework/Component/Transform/Transform.h"
-#include "Runtime/Core/Time/Time.h"
-
-namespace LitchiRuntime
-{
-    void MovingPlatform::OnUpdate()
-    {
-        // TODO: 实现移动逻辑
-    }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<MovingPlatform>("MovingPlatform")
-            .constructor<>();
+        transform.Rotate(rotationSpeed * Time.deltaTime);
     }
 }
 ```
 
-**验证**: 编译项目，确保没有错误。
+而在 LitchiEngine 的 C++ 中，我们需要：
+1. RTTR 注册
+2. Inspector 注册
+3. as_raw_ptr 策略
 
----
+### 原因：反射机制不同
 
-## 第三节：添加移动属性
+| 特性 | C# (Mono) | C++ (RTTR) |
+|------|-----------|------------|
+| 反射 | 语言内置 | 需要手动注册 |
+| 类型信息 | 运行时自动获取 | 编译时生成 |
+| 属性访问 | 自动支持 | 需要显式注册 |
+| 序列化 | 自动处理 | 需要手动配置 |
 
-### 问题：如何定义移动路径？
+### C# 反射原理
 
-我们需要：
-1. 起点 (pointA)
-2. 终点 (pointB)
-3. 移动速度
-4. 记录当前位置
+C# 的 Mono 运行时可以在运行时获取类型的所有信息：
 
-### 第三步：添加属性
+```csharp
+// C# 可以在运行时遍历所有字段
+Type type = typeof(RotateScript);
+FieldInfo[] fields = type.GetFields();  // 自动获取所有 public 字段
+```
 
-更新头文件：
+引擎加载 C# 程序集时，Mono 会自动：
+1. 扫描所有类
+2. 提取字段信息
+3. 生成元数据
+
+**相关代码**：`Engine/Source/Runtime/Function/Scripting/ScriptEngine.cpp`
 
 ```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Math/Vector3.h"
-
-namespace LitchiRuntime
+// 加载程序集时自动扫描类型
+void ScriptEngine::LoadAssemblyClasses()
 {
-    class MovingPlatform : public Component
+    // Mono 提供的 API 自动获取类型信息
+    MonoClass* monoClass = mono_class_from_name(image, nameSpace, className);
+    
+    // 遍历所有字段
+    while (MonoClassField* field = mono_class_get_fields(monoClass, &iterator))
     {
-    public:
-        MovingPlatform() = default;
-        ~MovingPlatform() override = default;
-
-        // 新增属性
-        Vector3 pointA{0.0f, 0.0f, 0.0f};      // 起点（世界坐标）
-        Vector3 pointB{0.0f, 2.0f, 0.0f};      // 终点（世界坐标）
-        float speed = 1.0f;                      // 移动速度
-
-        void OnUpdate() override;
-
-    private:
-        float m_progress = 0.0f;  // 当前进度 (0-1)
-        bool m_movingToB = true;  // 移动方向
-
-        RTTR_ENABLE(Component)
-    };
+        MonoType* type = mono_field_get_type(field);
+        // 自动记录字段类型...
+    }
 }
 ```
 
-### 第四步：注册属性
+### C++ 需要手动注册的原因
 
-更新 RTTR 注册：
+C++ 是静态编译语言，编译后：
+- 类型信息被"擦除"
+- 字段名变成内存偏移
+- 没有运行时类型信息（除非手动添加）
+
+RTTR 库通过宏在编译时生成元数据：
 
 ```cpp
+// RTTR 在编译时生成类型信息
 RTTR_REGISTRATION
 {
-    rttr::registration::class_<MovingPlatform>("MovingPlatform")
-        .constructor<>()
-        .property("pointA", &MovingPlatform::pointA)
-        .property("pointB", &MovingPlatform::pointB)
-        .property("speed", &MovingPlatform::speed);
+    rttr::registration::class_<RotateComponent>("RotateComponent")
+        .property("rotationSpeed", &RotateComponent::rotationSpeed);
 }
 ```
 
----
-
-## 第四节：实现移动逻辑
-
-### 理解移动模式
-
-平台在 A 和 B 之间来回移动：
+### 对比图
 
 ```
-A -----> B
-    t: 0 to 1
+┌─────────────────────────────────────────────────────────┐
+│                    C# 脚本流程                           │
+├─────────────────────────────────────────────────────────┤
+│  写代码 → 编译 → 引擎加载程序集 → Mono 自动提取元数据    │
+│                          ↓                              │
+│                    Inspector 自动显示                    │
+└─────────────────────────────────────────────────────────┘
 
-B -----> A
-    t: 1 to 0
+┌─────────────────────────────────────────────────────────┐
+│                   C++ 组件流程                           │
+├─────────────────────────────────────────────────────────┤
+│  写代码 → RTTR 宏注册 → 编译 → 引擎读取 RTTR 元数据      │
+│                          ↓                              │
+│                    Inspector 显示（需手动添加）          │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### 第五步：实现进度更新
+### 想深入了解？
 
-更新 `OnUpdate`：
+如果你想了解 C# 脚本系统的实现细节，可以阅读：
 
-```cpp
-void MovingPlatform::OnUpdate()
-{
-    Transform* transform = GetGameObject()->GetTransform();
-    if (!transform) return;
+| 文件 | 内容 |
+|------|------|
+| `ScriptEngine.h/cpp` | Mono 运行时初始化、脚本实例管理 |
+| `ScriptCore/Source/InternalCalls.cs` | C# 到 C++ 的内部调用绑定 |
+| `ScriptRegister.cpp` | C++ 端的脚本注册 |
 
-    float dt = Time::GetDeltaTime();
-
-    // 更新进度
-    m_progress += dt * speed;
-
-    // 检查是否到达终点
-    if (m_progress >= 1.0f)
-    {
-        m_progress = 0.0f;
-        m_movingToB = !m_movingToB;  // 反向
-    }
-
-    // 计算实际的插值参数
-    float t = m_movingToB ? m_progress : (1.0f - m_progress);
-
-    // 应用位置
-    Vector3 newPos = Vector3::Lerp(pointA, pointB, t);
-    transform->SetPosition(newPos);
-}
-```
-
-**问题**：这种实现有个缺陷——速度会受帧率影响。让我们修正它。
-
-### 第六步：改进实现
-
-上面的实现有一个问题：速度应该表示"从 A 到 B 需要多少秒"，而不是模糊的"速度值"。
-
-```cpp
-void MovingPlatform::OnUpdate()
-{
-    Transform* transform = GetGameObject()->GetTransform();
-    if (!transform) return;
-
-    float dt = Time::GetDeltaTime();
-
-    // 累计时间
-    m_progress += dt * speed;
-
-    // 使用往返插值
-    float t = m_progress;
-    if (t > 1.0f)
-    {
-        t = 2.0f - t;  // 反向
-    }
-    if (t > 2.0f)
-    {
-        t = 0.0f;
-        m_progress = 0.0f;
-    }
-
-    Vector3 newPos = Vector3::Lerp(pointA, pointB, t);
-    transform->SetPosition(newPos);
-}
-```
-
-### 第七步：使用 PingPong 数学
-
-更优雅的实现使用数学函数：
-
-```cpp
-void MovingPlatform::OnUpdate()
-{
-    Transform* transform = GetGameObject()->GetTransform();
-    if (!transform) return;
-
-    float dt = Time::GetDeltaTime();
-
-    // 累计时间
-    m_progress += dt * speed;
-
-    // PingPong 效果：t 在 0-1 之间来回
-    float t = m_progress - (int)m_progress;  // 取小数部分
-    int cycle = (int)m_progress;
-
-    if (cycle % 2 == 1)
-    {
-        t = 1.0f - t;  // 奇数周期反向
-    }
-
-    Vector3 newPos = Vector3::Lerp(pointA, pointB, t);
-    transform->SetPosition(newPos);
-}
-```
-
----
-
-## 第五节：完整代码
-
-### 头文件
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Math/Vector3.h"
-
-namespace LitchiRuntime
-{
-    class MovingPlatform : public Component
-    {
-    public:
-        MovingPlatform() = default;
-        ~MovingPlatform() override = default;
-
-        Vector3 pointA{0.0f, 0.0f, 0.0f};
-        Vector3 pointB{0.0f, 2.0f, 0.0f};
-        float speed = 1.0f;
-
-        void OnUpdate() override;
-
-    private:
-        float m_progress = 0.0f;
-
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
-### 实现文件
-
-```cpp
-#include "MovingPlatform.h"
-#include "Runtime/Function/Framework/Component/Transform/Transform.h"
-#include "Runtime/Core/Time/Time.h"
-
-namespace LitchiRuntime
-{
-    void MovingPlatform::OnUpdate()
-    {
-        Transform* transform = GetGameObject()->GetTransform();
-        if (!transform) return;
-
-        float dt = Time::GetDeltaTime();
-        m_progress += dt * speed;
-
-        // PingPong 插值
-        float t = m_progress - (int)m_progress;
-        if (((int)m_progress) % 2 == 1)
-        {
-            t = 1.0f - t;
-        }
-
-        Vector3 newPos = Vector3::Lerp(pointA, pointB, t);
-        transform->SetPosition(newPos);
-    }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<MovingPlatform>("MovingPlatform")
-            .constructor<>()
-            .property("pointA", &MovingPlatform::pointA)
-            .property("pointB", &MovingPlatform::pointB)
-            .property("speed", &MovingPlatform::speed);
-    }
-}
-```
-
----
-
-## 练习
-
-### 1. 基础练习：暂停功能
-
-添加 `bool paused` 属性，控制平台是否移动。
-
-### 2. 进阶练习：缓动效果
-
-使用 SmoothStep 代替线性插值，让平台在起点和终点处有缓入缓出效果。
-
-**提示**：
-```cpp
-float smoothT = t * t * (3 - 2 * t);  // SmoothStep
-```
-
-### 3. 挑战：多路径点
-
-扩展组件支持多个路径点，而不仅是 A、B 两点。
-
----
-
-## 验证标准
-
-- [ ] 平台在 pointA 和 pointB 之间移动
-- [ ] 移动速度与帧率无关
-- [ ] 编辑器中可配置 pointA、pointB、speed
-- [ ] 速度改变后移动频率相应变化
-
----
-
-## 总结
-
-本教程学习了：
-
-| 知识点 | 说明 |
-|--------|------|
-| Vector3::Lerp | 向量线性插值 |
-| 时间累加 | 用 deltaTime 控制动画进度 |
-| PingPong 模式 | 实现来回往复运动 |
-| 帧无关动画 | 使用 deltaTime 确保一致性 |
+**探索任务**：
+1. 打开 `ScriptEngine.cpp`，找到 `LoadAssemblyClasses` 函数
+2. 观察它如何使用 Mono API 遍历类型和字段
+3. 对比 C++ 的 RTTR 注册方式
 
 ---
 
 ## 下一步
 
-继续学习：
 
-**教程 3：物理系统入门 - TriggerZone**
-
-学习如何使用物理系统检测碰撞和触发事件。
-
----
-
-# 教程 3：物理系统入门 - TriggerZone
-
-## 概述
-
-通过创建一个触发区域组件，学习：
-
-- 物理碰撞器 (Collider)
-- 触发器事件 (Trigger)
-- 组件间协作
-
-**预期成果**：一个能检测物体进入并触发事件的 TriggerZone 组件。
-
-## 前置要求
-
-- 完成教程 1、2
-- 了解基本的物理概念（碰撞、触发器）
-- 理解事件驱动编程
-
----
-
-## 第一节：理解物理系统
-
-### 碰撞器 vs 触发器
-
-| 类型 | 特点 | 用途 |
-|------|------|------|
-| 碰撞器 | 产生物理碰撞，阻止物体穿过 | 墙壁、地面、障碍物 |
-| 触发器 | 只检测重叠，不产生碰撞 | 检测区域、传送门、收集品 |
-
-### LitchiEngine 的物理组件
-
-```
-Engine/Source/Runtime/Function/Framework/Component/Physcis/
-├── collider.h          # 碰撞器基类
-├── BoxCollider.h       # 盒形碰撞器
-├── SphereCollider.h    # 球形碰撞器
-├── RigidStatic.h       # 静态刚体（不动）
-└── RigidDynamic.h      # 动态刚体（可移动、受力）
-```
-
-### 触发器的工作原理
-
-1. 触发器需要有 Collider 组件（设置为 Trigger）
-2. 触发器需要 RigidActor（Static 或 Dynamic）
-3. 进入触发器的物体也需要 Collider
-
----
-
-## 第二节：创建基础结构
-
-### 第一步：创建头文件
-
-创建 `TriggerZone.h`：
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Tools/Eventing/Event.h"
-
-namespace LitchiRuntime
-{
-    class GameObject;
-
-    class TriggerZone : public Component
-    {
-    public:
-        TriggerZone() = default;
-        ~TriggerZone() override = default;
-
-        // 事件：当物体进入时触发
-        Event<GameObject*> OnPlayerEnter;
-
-        void OnAwake() override;
-        void OnTriggerEnter(GameObject* other) override;
-
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
-### 第二步：创建实现文件
-
-创建 `TriggerZone.cpp`：
-
-```cpp
-#include "TriggerZone.h"
-#include "Runtime/Function/Framework/Component/Physcis/BoxCollider.h"
-#include "Runtime/Function/Framework/Component/Physcis/RigidStatic.h"
-
-namespace LitchiRuntime
-{
-    void TriggerZone::OnAwake()
-    {
-        // TODO: 设置碰撞器
-    }
-
-    void TriggerZone::OnTriggerEnter(GameObject* other)
-    {
-        // TODO: 触发事件
-    }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<TriggerZone>("TriggerZone")
-            .constructor<>();
-    }
-}
-```
-
----
-
-## 第三节：自动配置碰撞器
-
-### 问题：触发器需要碰撞器
-
-TriggerZone 本身只是一个逻辑组件，它需要 Collider 来检测物理重叠。我们可以：
-
-1. 要求用户手动添加 Collider —— 麻烦
-2. 自动添加所需组件 —— 更好的体验
-
-### 第三步：在 OnAwake 中配置
-
-```cpp
-void TriggerZone::OnAwake()
-{
-    // 检查或添加 BoxCollider
-    BoxCollider* collider = GetGameObject()->GetComponent<BoxCollider>();
-    if (!collider)
-    {
-        collider = GetGameObject()->AddComponent<BoxCollider>();
-    }
-
-    // 设为触发器
-    collider->SetIsTrigger(true);
-
-    // 检查或添加 RigidStatic（触发器不需要物理模拟）
-    RigidStatic* rigid = GetGameObject()->GetComponent<RigidStatic>();
-    if (!rigid)
-    {
-        GetGameObject()->AddComponent<RigidStatic>();
-    }
-}
-```
-
-**为什么要添加 RigidStatic？**
-
-在 PhysX 中，触发器需要 RigidActor 作为物理实体。RigidStatic 表示这个物体不会移动（不受物理影响），适合作为触发区域。
-
----
-
-## 第四节：处理触发事件
-
-### 第四步：实现 OnTriggerEnter
-
-```cpp
-void TriggerZone::OnTriggerEnter(GameObject* other)
-{
-    // 触发事件
-    OnPlayerEnter.Invoke(other);
-
-    // 输出日志
-    DEBUG_LOG_INFO("物体进入触发区域: {}", other->GetName());
-}
-```
-
-### Event 类的使用
-
-LitchiEngine 的 Event 类提供了发布-订阅模式：
-
-```cpp
-// 定义事件
-Event<GameObject*> OnPlayerEnter;
-
-// 触发事件
-OnPlayerEnter.Invoke(someGameObject);
-
-// 订阅事件（在其他组件中）
-triggerZone->OnPlayerEnter += [](GameObject* obj) {
-    // 处理逻辑
-};
-```
-
----
-
-## 第五节：完整代码
-
-### 头文件
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Tools/Eventing/Event.h"
-
-namespace LitchiRuntime
-{
-    class GameObject;
-
-    class TriggerZone : public Component
-    {
-    public:
-        TriggerZone() = default;
-        ~TriggerZone() override = default;
-
-        Event<GameObject*> OnPlayerEnter;
-
-        void OnAwake() override;
-        void OnTriggerEnter(GameObject* other) override;
-
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
-### 实现文件
-
-```cpp
-#include "TriggerZone.h"
-#include "Runtime/Function/Framework/Component/Physcis/BoxCollider.h"
-#include "Runtime/Function/Framework/Component/Physcis/RigidStatic.h"
-#include "Runtime/Core/Log/Log.h"
-
-namespace LitchiRuntime
-{
-    void TriggerZone::OnAwake()
-    {
-        BoxCollider* collider = GetGameObject()->GetComponent<BoxCollider>();
-        if (!collider)
-        {
-            collider = GetGameObject()->AddComponent<BoxCollider>();
-        }
-        collider->SetIsTrigger(true);
-
-        RigidStatic* rigid = GetGameObject()->GetComponent<RigidStatic>();
-        if (!rigid)
-        {
-            GetGameObject()->AddComponent<RigidStatic>();
-        }
-    }
-
-    void TriggerZone::OnTriggerEnter(GameObject* other)
-    {
-        OnPlayerEnter.Invoke(other);
-        DEBUG_LOG_INFO("物体进入触发区域: {}", other->GetName());
-    }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<TriggerZone>("TriggerZone")
-            .constructor<>();
-    }
-}
-```
-
----
-
-## 第六节：测试
-
-### 测试场景设置
-
-1. 创建一个 Cube 作为触发区域
-2. 添加 TriggerZone 组件（会自动添加 BoxCollider 和 RigidStatic）
-3. 创建另一个 Cube 作为玩家
-4. 给玩家添加 RigidDynamic（让物理引擎处理它）
-5. 运行场景，让玩家落入触发区域
-
-### 预期效果
-
-- 控制台输出 "物体进入触发区域" 日志
-- 玩家穿过触发区域（不产生物理碰撞）
-
----
-
-## 练习
-
-### 1. 基础练习：添加离开事件
-
-添加 `OnTriggerExit` 的处理和 `OnPlayerExit` 事件。
-
-### 2. 进阶练习：标签过滤
-
-添加 `std::string targetTag` 属性，只响应特定标签的物体。
-
-```cpp
-void TriggerZone::OnTriggerEnter(GameObject* other)
-{
-    if (targetTag.empty() || other->GetTag() == targetTag)
-    {
-        OnPlayerEnter.Invoke(other);
-    }
-}
-```
-
-### 3. 挑战：计数触发器
-
-添加计数功能，记录当前在触发区域内的物体数量。
-
-```cpp
-private:
-    std::set<GameObject*> m_objectsInside;
-
-public:
-    int GetCount() const { return m_objectsInside.size(); }
-```
-
----
-
-## 验证标准
-
-- [ ] 添加 TriggerZone 后自动添加所需组件
-- [ ] 触发区域不产生物理碰撞
-- [ ] 物体进入时触发事件
-- [ ] 控制台输出正确日志
-
----
-
-## 总结
-
-本教程学习了：
-
-| 知识点 | 说明 |
-|--------|------|
-| Collider | 定义物理形状 |
-| IsTrigger | 设为触发器模式 |
-| RigidStatic | 静态物理体 |
-| OnTriggerEnter | 触发器进入回调 |
-| Event<> | 事件系统，组件间通信 |
-
----
-
-## 下一步
-
-继续学习：
-
-**教程 4：事件系统应用 - TimerTrigger**
-
-深入学习事件系统，创建计时触发器组件。
-
----
-
-# 教程 4：事件系统应用 - TimerTrigger
-
-## 概述
-
-通过创建一个计时触发器组件，深入学习：
-
-- Event 事件系统
-- 订阅/触发事件
-- 组件间通信
-
-**预期成果**：一个可配置的计时器，时间到后触发事件。
-
-## 前置要求
-
-- 完成教程 1、2、3
-- 理解回调函数概念
-- 了解观察者模式
-
----
-
-## 第一节：理解事件系统
-
-### 为什么需要事件系统？
-
-传统的问题：组件 A 想通知组件 B
-
-```cpp
-// 不好的方式：直接引用
-class ComponentA {
-    ComponentB* b;
-    void DoSomething() {
-        b->OnSomethingHappened();  // 紧耦合
-    }
-};
-```
-
-使用事件的优势：
-
-```cpp
-// 好的方式：使用事件
-class ComponentA {
-    Event<> OnSomething;
-    void DoSomething() {
-        OnSomething.Invoke();  // 松耦合
-    }
-};
-
-// 组件 B 订阅事件
-a->OnSomething += []() { /* 处理 */ };
-```
-
-### LitchiEngine 的 Event 类
-
-```cpp
-template<class... ArgTypes>
-class Event {
-public:
-    // 添加监听器
-    ListenerID AddListener(Callback callback);
-    ListenerID operator+=(Callback callback);
-
-    // 移除监听器
-    bool RemoveListener(ListenerID id);
-    bool operator-=(ListenerID id);
-
-    // 触发事件
-    void Invoke(ArgTypes... args);
-};
-```
-
----
-
-## 第二节：创建计时器组件
-
-### 第一步：创建头文件
-
-创建 `TimerTrigger.h`：
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Tools/Eventing/Event.h"
-
-namespace LitchiRuntime
-{
-    class TimerTrigger : public Component
-    {
-    public:
-        TimerTrigger() = default;
-        ~TimerTrigger() override = default;
-
-        void OnUpdate() override;
-
-    private:
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
-### 第二步：添加计时属性
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Tools/Eventing/Event.h"
-
-namespace LitchiRuntime
-{
-    class TimerTrigger : public Component
-    {
-    public:
-        TimerTrigger() = default;
-        ~TimerTrigger() override = default;
-
-        // 计时时长（秒）
-        float duration = 3.0f;
-
-        // 是否循环
-        bool loop = false;
-
-        // 事件：时间到
-        Event<> OnTimerEnd;
-
-        void OnUpdate() override;
-
-        // 控制方法
-        void Start();
-        void Stop();
-        void Reset();
-
-    private:
-        float m_elapsed = 0.0f;
-        bool m_running = false;
-
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
----
-
-## 第三节：实现计时逻辑
-
-### 第三步：实现控制方法
-
-创建 `TimerTrigger.cpp`：
-
-```cpp
-#include "TimerTrigger.h"
-#include "Runtime/Core/Time/Time.h"
-
-namespace LitchiRuntime
-{
-    void TimerTrigger::Start()
-    {
-        m_running = true;
-        m_elapsed = 0.0f;
-    }
-
-    void TimerTrigger::Stop()
-    {
-        m_running = false;
-    }
-
-    void TimerTrigger::Reset()
-    {
-        m_elapsed = 0.0f;
-    }
-}
-```
-
-### 第四步：实现 OnUpdate
-
-```cpp
-void TimerTrigger::OnUpdate()
-{
-    if (!m_running) return;
-
-    m_elapsed += Time::GetDeltaTime();
-
-    if (m_elapsed >= duration)
-    {
-        // 触发事件
-        OnTimerEnd.Invoke();
-
-        if (loop)
-        {
-            m_elapsed = 0.0f;
-        }
-        else
-        {
-            m_running = false;
-        }
-    }
-}
-```
-
-### 第五步：RTTR 注册
-
-```cpp
-RTTR_REGISTRATION
-{
-    rttr::registration::class_<TimerTrigger>("TimerTrigger")
-        .constructor<>()
-        .property("duration", &TimerTrigger::duration)
-        .property("loop", &TimerTrigger::loop);
-}
-```
-
----
-
-## 第四节：使用示例
-
-### 场景：延时启动
-
-结合 TriggerZone，创建一个延时触发的门：
-
-```cpp
-// 在某个组件中
-void DoorController::OnAwake()
-{
-    // 找到 TimerTrigger
-    TimerTrigger* timer = GetGameObject()->GetComponent<TimerTrigger>();
-
-    // 订阅事件
-    m_listenerId = timer->OnTimerEnd += [this]() {
-        OpenDoor();
-    };
-}
-
-void DoorController::OnDestroy()
-{
-    // 清理监听器
-    TimerTrigger* timer = GetGameObject()->GetComponent<TimerTrigger>();
-    if (timer)
-    {
-        timer->OnTimerEnd -= m_listenerId;
-    }
-}
-```
-
-### 场景：循环事件
-
-创建闪烁的灯光：
-
-```cpp
-void LightBlinker::OnAwake()
-{
-    TimerTrigger* timer = GetGameObject()->GetComponent<TimerTrigger>();
-    timer->loop = true;
-    timer->duration = 0.5f;
-
-    timer->OnTimerEnd += [this]() {
-        ToggleLight();
-    };
-
-    timer->Start();
-}
-```
-
----
-
-## 第五节：完整代码
-
-### 头文件
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Tools/Eventing/Event.h"
-
-namespace LitchiRuntime
-{
-    class TimerTrigger : public Component
-    {
-    public:
-        TimerTrigger() = default;
-        ~TimerTrigger() override = default;
-
-        float duration = 3.0f;
-        bool loop = false;
-
-        Event<> OnTimerEnd;
-
-        void OnUpdate() override;
-
-        void Start();
-        void Stop();
-        void Reset();
-
-        bool IsRunning() const { return m_running; }
-        float GetProgress() const { return m_elapsed / duration; }
-
-    private:
-        float m_elapsed = 0.0f;
-        bool m_running = false;
-
-        RTTR_ENABLE(Component)
-    };
-}
-```
-
-### 实现文件
-
-```cpp
-#include "TimerTrigger.h"
-#include "Runtime/Core/Time/Time.h"
-
-namespace LitchiRuntime
-{
-    void TimerTrigger::Start()
-    {
-        m_running = true;
-        m_elapsed = 0.0f;
-    }
-
-    void TimerTrigger::Stop()
-    {
-        m_running = false;
-    }
-
-    void TimerTrigger::Reset()
-    {
-        m_elapsed = 0.0f;
-    }
-
-    void TimerTrigger::OnUpdate()
-    {
-        if (!m_running) return;
-
-        m_elapsed += Time::GetDeltaTime();
-
-        if (m_elapsed >= duration)
-        {
-            OnTimerEnd.Invoke();
-
-            if (loop)
-            {
-                m_elapsed = 0.0f;
-            }
-            else
-            {
-                m_running = false;
-            }
-        }
-    }
-
-    RTTR_REGISTRATION
-    {
-        rttr::registration::class_<TimerTrigger>("TimerTrigger")
-            .constructor<>()
-            .property("duration", &TimerTrigger::duration)
-            .property("loop", &TimerTrigger::loop);
-    }
-}
-```
-
----
-
-## 练习
-
-### 1. 基础练习：进度访问
-
-添加 `GetProgress()` 方法，返回当前进度 (0-1)。
-
-### 2. 进阶练习：带参数的事件
-
-修改事件为 `Event<float>`，触发时传递剩余时间或当前进度。
-
-### 3. 挑战：计时器组
-
-创建 `TimerGroup` 组件，管理多个计时器，支持序列触发。
-
-```cpp
-class TimerGroup : public Component {
-public:
-    std::vector<float> durations;
-    int currentIndex = 0;
-    Event<int> OnTimerComplete;  // 传递完成的计时器索引
-};
-```
-
----
-
-## 验证标准
-
-- [ ] 计时器能正常计时
-- [ ] 时间到触发事件
-- [ ] 循环模式正常工作
-- [ ] Start/Stop/Reset 方法正常
-- [ ] 事件订阅者能正确响应
-
----
-
-## 总结
-
-本教程学习了：
-
-| 知识点 | 说明 |
-|--------|------|
-| Event<> | 事件类，实现观察者模式 |
-| += 订阅 | 添加事件监听器 |
-| -= 取消订阅 | 移除事件监听器 |
-| Invoke | 触发事件 |
-| 松耦合 | 通过事件解耦组件 |
 
 ---
 
@@ -1599,9 +613,7 @@ public:
 | 教程 | 核心知识点 |
 |------|-----------|
 | RotateComponent | 组件架构、生命周期、Transform、四元数 |
-| MovingPlatform | 向量数学、插值、时间控制 |
-| TriggerZone | 物理系统、碰撞器、触发器 |
-| TimerTrigger | 事件系统、组件通信 |
+
 
 ### 下一步学习方向
 
@@ -1620,6 +632,9 @@ public:
 | 物理系统 | `Engine/Source/Runtime/Function/Physics/` |
 | 时间管理 | `Engine/Source/Runtime/Core/Time/` |
 | 事件系统 | `Engine/Source/Runtime/Core/Tools/Eventing/` |
+| 脚本系统 | `Engine/Source/Runtime/Function/Scripting/` |
+| C# 脚本核心 | `Engine/Source/ScriptCore/Source/` |
+| RTTR 类型注册 | `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h` |
 
 ---
 
