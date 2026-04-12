@@ -47,7 +47,7 @@ void LitchiEditor::EditorActions::LoadEmptyScene()
 
 void LitchiEditor::EditorActions::SaveCurrentSceneTo(const std::string& p_path)
 {
-	// »ñÈ¡µ±Ç°µÄ³¡¾°
+	// ï¿½ï¿½È¡ï¿½ï¿½Ç°ï¿½Ä³ï¿½ï¿½ï¿½
 	LitchiEditor::ApplicationEditor::Instance()->sceneManager->SaveCurrentScene(p_path);
 }
 
@@ -474,8 +474,12 @@ void LitchiEditor::EditorActions::StartPlaying()
 		//if (LitchiEditor::ApplicationEditor::Instance()->scriptInterpreter->IsOk())
 		{
 			PlayEvent.Invoke();
-			
+
 			auto currScene = LitchiEditor::ApplicationEditor::Instance()->sceneManager->GetCurrentScene();
+			if (!currScene) {
+				DEBUG_LOG_ERROR("StartPlaying: currScene is nullptr!");
+				return;
+			}
 
 			m_sceneBackup = Serializer::SerializeToJson(currScene);
 
@@ -484,7 +488,6 @@ void LitchiEditor::EditorActions::StartPlaying()
 			SetEditorMode(EEditorMode::PLAY);
 			ApplicationEditor::Instance()->m_rendererPath4GameView->SetScene(LitchiEditor::ApplicationEditor::Instance()->sceneManager->GetCurrentScene());
 			ApplicationEditor::Instance()->m_rendererPath4GameView->SetActive(true);
-
 		}
 	}
 	else

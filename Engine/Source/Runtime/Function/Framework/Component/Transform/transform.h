@@ -1,6 +1,7 @@
 ﻿
 #pragma once
 
+#include <mutex>
 #include "Runtime/Function/Framework/Component/Base/component.h"
 #include "Runtime/Core/Math/Vector3.h"
 #include "Runtime/Core/Math/Matrix.h"
