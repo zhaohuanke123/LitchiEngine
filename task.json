@@ -560,6 +560,35 @@
         "覆盖了组件生命周期触发时机",
         "覆盖了场景备份恢复机制"
       ]
+    },
+    {
+      "id": 20,
+      "title": "深入分析着色器管理与材质绑定机制",
+      "description": "深入分析引擎中着色器的管理机制，包括 MaterialShader 类的设计、着色器资源管理、Uniform 系统、描述符绑定机制、以及材质与着色器的关联方式。理解材质参数如何从编辑器传递到 GPU。",
+      "steps": [
+        "分析 MaterialShader 类：LoadFromFile、LoadMaterialDescriptors、GetGlobalUniformInfo",
+        "分析 ShaderUniform 结构：成员名称、类型、偏移、大小",
+        "分析着色器反射机制：SPIR-V 反射如何提取 cbuffer 成员信息",
+        "分析 Material 类：PostResourceLoaded、Uniform 数据存储、SyncToDataBuffer",
+        "分析描述符绑定约定：材质 cbuffer 的 slot 约定 (register b10)、纹理 slot 约定 (t100+)",
+        "分析材质文件格式 (.mat)：uniformInfoList 的序列化和反序列化",
+        "分析 CheckIsMaterialDescriptor 函数：如何判断一个描述符属于材质",
+        "总结着色器管理的设计模式和最佳实践"
+      ],
+      "priority": "high",
+      "dependencies": [
+        9
+      ],
+      "passes": true,
+      "validation_notes": [
+        "分析文档已生成: docs/analysis/17_shader_material_binding.md",
+        "覆盖了 MaterialShader 类设计",
+        "覆盖了 SPIR-V 反射机制",
+        "覆盖了 Uniform 系统设计",
+        "覆盖了描述符绑定约定",
+        "覆盖了材质文件格式",
+        "覆盖了材质参数传递流程"
+      ]
     }
   ]
 }

@@ -374,6 +374,42 @@
 
 ---
 
+## [2026-04-13] - 新增任务：着色器管理与材质绑定机制分析
+
+### What was done:
+- 新增任务 #20：深入分析着色器管理与材质绑定机制
+- 任务依赖关系：#20 依赖 #9 (着色器系统分析)
+
+### Notes:
+- 现有着色器分析 (Task #9) 侧重于 HLSL 代码层面
+- 新任务侧重于 C++ 端的着色器管理机制
+- 关键问题：MaterialShader 类设计、SPIR-V 反射、Uniform 系统、描述符绑定约定
+
+---
+
+## [2026-04-13] - Task #20: 深入分析着色器管理与材质绑定机制
+
+### What was done:
+- 分析了 MaterialShader 类设计：着色器组合、加载流程、描述符提取
+- 分析了 ShaderUniform 结构：类型、名称、偏移、大小
+- 分析了 SPIR-V 反射机制：spirv_cross 提取 cbuffer 成员和纹理描述符
+- 分析了 Material 类：Uniform 数据存储、GPU 缓冲同步、纹理映射
+- 分析了描述符绑定约定：材质 cbuffer 必须使用 register(b10)、纹理使用 t100+
+- 分析了材质文件格式：JSON 序列化、UniformInfo 类型系统
+- 分析了 CheckIsMaterialDescriptor 函数：slot >= 500 或 slot == 210 判断材质
+
+### Testing:
+- 文档输出: docs/analysis/17_shader_material_binding.md
+
+### Notes:
+- 材质 cbuffer 必须命名为 "Material" 才能被识别
+- 未使用的纹理会被编译器优化掉，导致反射时找不到
+- DXCompiler 通过 -fvk-b-shift/t-shift 参数实现 HLSL slot 到 SPIR-V binding 的映射
+- Uniform 数据通过 std::any 类型擦除统一存储
+- 脏标记模式用于延迟更新 GPU 数据
+
+---
+
 ## 已完成任务
 
 ### 分析任务 (Analysis Tasks)
