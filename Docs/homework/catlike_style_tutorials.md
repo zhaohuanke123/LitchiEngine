@@ -19,9 +19,7 @@
 | 系列 | 教程 | 难度 | 前置要求 |
 |------|------|------|----------|
 | 引擎基础 | 教程 1: 组件系统入门 | 入门 | 无 |
-| 引擎基础 | 教程 2: 向量数学应用 | 入门 | 教程 1 |
-| 引擎基础 | 教程 3: 物理系统入门 | 进阶 | 教程 2 |
-| 引擎基础 | 教程 4: 事件系统应用 | 进阶 | 教程 3 |
+| 渲染入门 | 教程 2: 自定义着色器 | 进阶 | 教程 1 |
 
 ### 开发环境要求
 
@@ -600,7 +598,651 @@ RTTR_REGISTRATION
 
 ---
 
+# 教程 2：自定义着色器 - 脉冲发光效果
+
+## 概述
+
+通过创建一个自定义着色器和材质，学习 LitchiEngine 的渲染管线。完成后，你将理解：
+
+- 着色器文件结构
+- 材质与着色器的关系
+- Uniform 数据传递机制
+- 常量缓冲区 (Constant Buffer)
+
+**预期成果**：一个能让物体产生脉冲发光效果的着色器和材质。
+
+## 前置要求
+
+- 已完成教程 1：组件系统入门
+- 了解 HLSL 基础语法（变量、函数、语义）
+- 了解 GPU 渲染管线的基本概念
+
+---
+
+## 第一节：理解渲染管线
+
+### 从组件到像素
+
+当你添加 MeshRenderer 组件并设置材质后，渲染流程如下：
+
+```
+MeshFilter (网格数据)
+     ↓
+MeshRenderer (材质引用)
+     ↓
+Material (着色器 + 参数)
+     ↓
+Vertex Shader (顶点变换)
+     ↓
+Pixel Shader (像素着色)
+     ↓
+屏幕上的像素
+```
+
+### 关键文件路径
+
+| 文件类型 | 路径 |
+|----------|------|
+| 着色器源码 | `Engine/Data/Engine/Shaders/` |
+| 材质文件 | `Engine/Data/Engine/Materials/` |
+| 着色器公共头文件 | `Engine/Data/Engine/Shaders/Common/` |
+| Material 类 | `Engine/Source/Runtime/Function/Renderer/Rendering/Material.h` |
+
+---
+
+## 第二节：分析现有着色器
+
+### 查看 forward.hlsl
+
+**文件路径**: `Engine/Data/Engine/Shaders/forward.hlsl`
+
+```hlsl
+//= INCLUDES =========
+#include "Common/common.hlsl"
+//====================
+
+Pixel_PosUvNorTan mainVS(Vertex_PosUvNorTan input)
+{
+    Pixel_PosUvNorTan output;
+
+    output.position = mul(input.position, buffer_pass.transform);
+    output.position = mul(output.position, buffer_rendererPath.view_projection);
+    output.uv = input.uv;
+    output.normal = normalize(mul(input.normal, (float3x3) buffer_pass.transform)).xyz;
+    output.normal = normalize(mul(output.normal, (float3x3) buffer_rendererPath.view_projection)).xyz;
+    output.tangent = normalize(mul(input.tangent, (float3x3) buffer_pass.transform)).xyz;
+    output.tangent = normalize(mul(output.tangent, (float3x3) buffer_rendererPath.view_projection)).xyz;
+
+    return output;
+}
+
+float4 mainPS(Pixel_PosUvNorTan input) : SV_Target
+{
+    return float4(0.644f, 0.003f, 0.005f, 1.0f);  // 固定红色
+}
+```
+
+**代码解析**：
+
+| 部分 | 说明 |
+|------|------|
+| `#include "Common/common.hlsl"` | 包含公共定义、常量缓冲区结构 |
+| `Vertex_PosUvNorTan` | 输入顶点结构（位置、UV、法线、切线） |
+| `Pixel_PosUvNorTan` | 输出到像素着色器的数据 |
+| `buffer_pass.transform` | 当前物体的世界矩阵 |
+| `buffer_rendererPath.view_projection` | 相机的视图投影矩阵 |
+| `SV_Target` | 像素着色器输出颜色 |
+
+### 常量缓冲区结构
+
+**文件路径**: `Engine/Data/Engine/Shaders/Common/common_buffers.hlsl`
+
+```hlsl
+// 每帧更新 - 相机数据
+cbuffer BufferRendererPath : register(b5)
+{
+    RendererPathBufferData buffer_rendererPath;
+}
+
+// 每物体更新 - 变换矩阵
+[[vk::push_constant]]
+PassBufferData buffer_pass;
+
+// 每材质更新 - 材质参数
+cbuffer BufferMaterial : register(b2)
+{
+    MaterialBufferData buffer_material;
+}
+```
+
+**更新频率**：
+
+| 缓冲区 | 更新频率 | 内容 |
+|--------|----------|------|
+| BufferRendererPath | 每帧 | 相机位置、视图投影矩阵 |
+| buffer_pass (Push Constant) | 每物体 | 世界变换矩阵 |
+| BufferMaterial | 每材质 | 颜色、粗糙度、金属度等 |
+
+---
+
+## 第三节：创建脉冲发光着色器
+
+### 问题：如何让颜色随时间变化？
+
+我们需要：
+1. 获取时间值（来自引擎）
+2. 使用正弦函数产生周期性变化
+3. 将时间传递给着色器
+
+### 第一步：创建着色器文件
+
+在 `Engine/Data/Engine/Shaders/` 目录下创建 `Pulse.hlsl`：
+
+```hlsl
+//= INCLUDES =========
+#include "Common/common.hlsl"
+//====================
+
+// 像素着色器输出
+struct PixelOutput
+{
+    float4 color : SV_Target0;
+};
+
+// 顶点着色器
+Pixel_PosUvNorTan mainVS(Vertex_PosUvNorTan input)
+{
+    Pixel_PosUvNorTan output;
+
+    // 变换到裁剪空间
+    output.position = mul(input.position, buffer_pass.transform);
+    output.position = mul(output.position, buffer_rendererPath.view_projection);
+
+    // 传递纹理坐标和法线
+    output.uv = input.uv;
+    output.normal = normalize(mul(input.normal, (float3x3) buffer_pass.transform));
+    output.tangent = normalize(mul(input.tangent, (float3x3) buffer_pass.transform));
+
+    return output;
+}
+
+// 像素着色器
+PixelOutput mainPS(Pixel_PosUvNorTan input)
+{
+    PixelOutput output;
+
+    // 使用帧数据的 delta_time 和 frame 计算脉冲
+    float time = buffer_frame.frame * buffer_frame.delta_time;
+    float pulse = 0.5 + 0.5 * sin(time * 3.0);  // 3.0 控制脉冲速度
+
+    // 基础颜色（青色）
+    float3 baseColor = float3(0.0, 0.8, 0.8);
+
+    // 混合脉冲效果
+    float3 finalColor = baseColor * (0.5 + 0.5 * pulse);
+
+    output.color = float4(finalColor, 1.0);
+
+    return output;
+}
+```
+
+**验证**: 此时着色器文件已创建，但还不能被引擎识别。
+
+### 第二步：理解 FrameBufferData
+
+查看 `common_buffers.hlsl` 中的帧数据结构：
+
+```hlsl
+struct FrameBufferData
+{
+    float2 resolution_render;
+    float2 resolution_output;
+
+    float2 taa_jitter_current;
+    float2 taa_jitter_previous;
+
+    float delta_time;  // 帧间隔时间
+    uint frame;        // 帧计数器
+    float gamma;
+    uint options;
+};
+
+cbuffer BufferFrame : register(b0)
+{
+    FrameBufferData buffer_frame;
+}
+```
+
+**为什么用 frame * delta_time？**
+
+| 方案 | 问题 |
+|------|------|
+| 直接用 `buffer_frame.frame` | 帧数增长太快，闪烁过快 |
+| 直接用 `buffer_frame.delta_time` | 只有一帧的时间，无法累积 |
+| `frame * delta_time` | 累积时间，平滑过渡 |
+
+---
+
+## 第四节：创建材质文件
+
+### 第三步：创建材质 JSON
+
+在 `Engine/Data/Engine/Materials/` 目录下创建 `Pulse.mat`：
+
+```json
+{
+  "vertexType": "PosUvNorTan",
+  "shaderPath": ":Shaders/Pulse.hlsl",
+  "uniformInfoList": []
+}
+```
+
+**字段说明**：
+
+| 字段 | 说明 |
+|------|------|
+| `vertexType` | 顶点类型，决定顶点着色器输入结构 |
+| `shaderPath` | 着色器路径，`:` 前缀表示引擎资源 |
+| `uniformInfoList` | 自定义 uniform 参数列表（暂时为空） |
+
+### 第四步：在编辑器中使用
+
+1. 重新编译引擎（着色器会被编译为 SPIR-V）
+2. 打开 LitchiEditor
+3. 创建一个 Cube
+4. 在 MeshRenderer 组件中设置 Material Path 为 `:Materials/Pulse.mat`
+5. 运行场景
+
+**预期效果**: 物体呈现青色脉冲发光效果。
+
+---
+
+## 第五节：添加可配置参数
+
+### 问题：如何让设计师调整颜色和速度？
+
+我们需要添加自定义 uniform 参数，让材质可配置。
+
+### 第五步：更新着色器
+
+修改 `Pulse.hlsl`，添加自定义参数：
+
+```hlsl
+//= INCLUDES =========
+#include "Common/common.hlsl"
+//====================
+
+// 自定义材质参数（通过常量缓冲区传递）
+cbuffer PulseParams : register(b2)
+{
+    float3 u_baseColor;    // 基础颜色
+    float u_pulseSpeed;    // 脉冲速度
+    float u_pulseIntensity; // 脉冲强度
+    float3 padding;        // 16字节对齐
+}
+
+struct PixelOutput
+{
+    float4 color : SV_Target0;
+};
+
+Pixel_PosUvNorTan mainVS(Vertex_PosUvNorTan input)
+{
+    Pixel_PosUvNorTan output;
+
+    output.position = mul(input.position, buffer_pass.transform);
+    output.position = mul(output.position, buffer_rendererPath.view_projection);
+
+    output.uv = input.uv;
+    output.normal = normalize(mul(input.normal, (float3x3) buffer_pass.transform));
+    output.tangent = normalize(mul(input.tangent, (float3x3) buffer_pass.transform));
+
+    return output;
+}
+
+PixelOutput mainPS(Pixel_PosUvNorTan input)
+{
+    PixelOutput output;
+
+    float time = buffer_frame.frame * buffer_frame.delta_time;
+    float pulse = 0.5 + 0.5 * sin(time * u_pulseSpeed);
+    float intensity = 1.0 - u_pulseIntensity * (1.0 - pulse);
+
+    float3 finalColor = u_baseColor * intensity;
+    output.color = float4(finalColor, 1.0);
+
+    return output;
+}
+```
+
+**注意**: 这里使用了 `register(b2)`，与 `BufferMaterial` 相同。引擎会自动处理材质参数的绑定。
+
+### 第六步：更新材质文件
+
+修改 `Pulse.mat`：
+
+```json
+{
+  "vertexType": "PosUvNorTan",
+  "shaderPath": ":Shaders/Pulse.hlsl",
+  "uniformInfoList": [
+    {
+      "Type": "UniformInfoVector3",
+      "name": "u_baseColor",
+      "vector": {
+        "x": 0.0,
+        "y": 0.8,
+        "z": 0.8
+      }
+    },
+    {
+      "Type": "UniformInfoFloat",
+      "name": "u_pulseSpeed",
+      "value": 3.0
+    },
+    {
+      "Type": "UniformInfoFloat",
+      "name": "u_pulseIntensity",
+      "value": 0.5
+    }
+  ]
+}
+```
+
+**Uniform 类型映射**：
+
+| 着色器类型 | JSON 类型 | C++ 类型 |
+|------------|-----------|----------|
+| `float` | UniformInfoFloat | float |
+| `float2` | UniformInfoVector2 | Vector2 |
+| `float3` | UniformInfoVector3 | Vector3 |
+| `float4` | UniformInfoVector4 | Vector4 |
+| `Texture2D` | UniformInfoTexture | RHI_Texture* |
+
+---
+
+## 第六节：理解材质系统
+
+### Material 类的工作流程
+
+**文件路径**: `Engine/Source/Runtime/Function/Renderer/Rendering/Material.h`
+
+```cpp
+class Material : public IResource
+{
+public:
+    // 设置 uniform 值
+    template<typename T>
+    void SetValue(const std::string& name, const T& value);
+
+    // 获取 uniform 值
+    template<typename T>
+    const T& GetValue(const std::string& key);
+
+    // 设置纹理
+    void SetTexture(const std::string& name, RHI_Texture* texture);
+
+    // 获取着色器
+    MaterialShader* GetShader() { return m_shader; }
+
+private:
+    MaterialRes* m_materialRes;                    // 序列化数据
+    MaterialShader* m_shader;                      // 着色器
+    std::map<std::string, std::any> m_uniformDataList;  // uniform 数据
+    std::shared_ptr<RHI_ConstantBuffer> m_valueConstantBuffer;  // GPU 缓冲区
+};
+```
+
+### 数据流向
+
+```
+材质 JSON 文件 (.mat)
+       ↓
+Material::LoadFromFile()
+       ↓
+MaterialRes (反序列化数据)
+       ↓
+Material::PostResourceLoaded()
+       ↓
+m_uniformDataList (运行时数据)
+       ↓
+Material::UpdateRenderData()
+       ↓
+RHI_ConstantBuffer (GPU 缓冲区)
+       ↓
+着色器读取
+```
+
+### 16字节对齐规则
+
+HLSL 常量缓冲区要求 16 字节对齐：
+
+```hlsl
+// 正确 ✓
+cbuffer MyParams
+{
+    float3 color;      // 12 bytes
+    float intensity;   // 4 bytes (填充到 16)
+}
+
+// 错误 ✗
+cbuffer MyParams
+{
+    float3 color;      // 12 bytes
+    float2 speed;      // 8 bytes - 跨越 16 字节边界！
+}
+```
+
+**对齐规则**：
+
+| 类型 | 大小 | 对齐要求 |
+|------|------|----------|
+| float | 4 bytes | 4 bytes |
+| float2 | 8 bytes | 8 bytes |
+| float3 | 12 bytes | 16 bytes |
+| float4 | 16 bytes | 16 bytes |
+| matrix | 64 bytes | 16 bytes |
+
+---
+
+## 第七节：运行时修改材质参数
+
+### 问题：如何在代码中动态改变材质属性？
+
+创建一个组件来控制脉冲效果。
+
+### 第七步：创建 PulseController 组件
+
+**头文件**: `Engine/Source/Runtime/Function/Framework/Component/Gameplay/PulseController.h`
+
+```cpp
+#pragma once
+
+#include "Runtime/Function/Framework/Component/Base/component.h"
+#include "Runtime/Core/Math/Vector3.h"
+
+namespace LitchiRuntime
+{
+    class PulseController : public Component
+    {
+    public:
+        PulseController() = default;
+        ~PulseController() override = default;
+
+        // 可配置参数
+        Vector3 baseColor{0.0f, 0.8f, 0.8f};
+        float pulseSpeed = 3.0f;
+        float pulseIntensity = 0.5f;
+
+        void OnUpdate() override;
+
+        RTTR_ENABLE(Component)
+    };
+}
+```
+
+**实现文件**: `Engine/Source/Runtime/Function/Framework/Component/Gameplay/PulseController.cpp`
+
+```cpp
+#include "PulseController.h"
+#include "Runtime/Function/Framework/GameObject/GameObject.h"
+#include "Runtime/Function/Framework/Component/Renderer/MeshRenderer.h"
+#include "Runtime/Function/Renderer/Rendering/Material.h"
+
+namespace LitchiRuntime
+{
+    void PulseController::OnUpdate()
+    {
+        // 获取 MeshRenderer 组件
+        MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
+        if (!renderer) return;
+
+        // 获取材质
+        Material* material = renderer->GetMaterial();
+        if (!material) return;
+
+        // 更新材质参数
+        material->SetValue("u_baseColor", baseColor);
+        material->SetValue("u_pulseSpeed", pulseSpeed);
+        material->SetValue("u_pulseIntensity", pulseIntensity);
+    }
+}
+```
+
+### 第八步：注册组件
+
+**TypeRegister.h**:
+
+```cpp
+rttr::registration::class_<PulseController>("PulseController")
+    .constructor<>()(rttr::policy::ctor::as_raw_ptr)
+    .property("baseColor", &PulseController::baseColor)
+    .property("pulseSpeed", &PulseController::pulseSpeed)
+    .property("pulseIntensity", &PulseController::pulseIntensity);
+```
+
+**Inspector.cpp**: 添加到组件选择器（参考教程 1 的步骤）。
+
+---
+
+## 验证标准
+
+- [ ] 着色器编译无错误
+- [ ] 材质文件正确加载
+- [ ] 物体显示脉冲发光效果
+- [ ] Inspector 中可调整材质参数
+- [ ] PulseController 组件能动态控制效果
+
+---
+
+## 总结
+
+本教程学习了：
+
+| 知识点 | 说明 |
+|--------|------|
+| 着色器结构 | 顶点着色器 + 像素着色器 |
+| 常量缓冲区 | GPU 数据传递机制 |
+| 材质文件 | JSON 格式的材质配置 |
+| Uniform 参数 | 着色器可配置参数 |
+| Material 类 | 运行时材质管理 |
+| 16字节对齐 | HLSL 缓冲区对齐规则 |
+
+### 创建自定义着色器的完整流程
+
+1. **编写着色器** - 在 `Engine/Data/Engine/Shaders/` 创建 .hlsl 文件
+2. **创建材质** - 在 `Engine/Data/Engine/Materials/` 创建 .mat 文件
+3. **配置参数** - 在材质 JSON 中定义 uniform 参数
+4. **使用材质** - 在 MeshRenderer 中设置材质路径
+5. **运行时控制** - 通过组件动态修改材质参数
+
+---
+
+## 延伸：着色器编译流程
+
+### 问题：HLSL 如何变成 GPU 可执行代码？
+
+LitchiEngine 使用 DXCompiler 将 HLSL 编译为 SPIR-V：
+
+```
+Pulse.hlsl (HLSL 源码)
+       ↓
+DXCompiler (编译器)
+       ↓
+Pulse.vert.spv (顶点着色器 SPIR-V)
+Pulse.frag.spv (像素着色器 SPIR-V)
+       ↓
+Vulkan 加载执行
+```
+
+**相关代码**: `Engine/Source/Runtime/Function/Renderer/RHI/RHI_DirectXShaderCompiler.cpp`
+
+### 为什么选择 HLSL？
+
+| 着色器语言 | 优点 | 缺点 |
+|------------|------|------|
+| HLSL | Windows 生态友好、DXCompiler 支持好 | 需要编译转换 |
+| GLSL | OpenGL/Vulkan 原生支持 | 工具链较弱 |
+| Slang | 现代化设计、跨平台 | 生态较小 |
+
+LitchiEngine 选择 HLSL + DXCompiler 方案，可以：
+- 使用 Visual Studio 的着色器调试工具
+- 生成优化的 SPIR-V 代码
+- 支持 #include 指令
+
+---
+
 ## 下一步
+
+恭喜完成渲染入门教程！你已学习：
+
+| 教程 | 核心知识点 |
+|------|-----------|
+| RotateComponent | 组件架构、生命周期、Transform |
+| PulseShader | 着色器管线、材质系统、Uniform 参数 |
+
+### 进阶方向
+
+1. **PBR 材质** - 学习物理渲染
+2. **后处理效果** - 学习全屏着色器
+3. **计算着色器** - 学习 GPU 通用计算
+
+---
+
+## 附录：常用着色器语义
+
+| 语义 | 说明 |
+|------|------|
+| `POSITION0` | 顶点位置 |
+| `TEXCOORD0` | 纹理坐标 |
+| `NORMAL0` | 法线 |
+| `TANGENT0` | 切线 |
+| `SV_POSITION` | 裁剪空间位置（系统值） |
+| `SV_Target` | 像素着色器输出颜色 |
+
+## 附录：调试技巧
+
+### 着色器编译错误
+
+查看编译输出日志，常见错误：
+
+| 错误 | 原因 | 解决方案 |
+|------|------|----------|
+| 未定义的变量 | 拼写错误或缺少 include | 检查变量名和头文件 |
+| 语义不匹配 | 输入输出结构不一致 | 确保 VS 输出 = PS 输入 |
+| 常量缓冲区对齐 | 16字节对齐问题 | 添加 padding 字段 |
+
+### 渲染问题排查
+
+1. **物体不显示** - 检查变换矩阵、相机视锥体
+2. **颜色错误** - 检查着色器计算逻辑
+3. **材质不加载** - 检查 JSON 格式和路径
+
+---
+
+**文档时间**: 2026-04-12
+**风格参考**: Catlike Coding (https://catlikecoding.com/)
 
 
 
@@ -613,6 +1255,7 @@ RTTR_REGISTRATION
 | 教程 | 核心知识点 |
 |------|-----------|
 | RotateComponent | 组件架构、生命周期、Transform、四元数 |
+| PulseShader | 着色器管线、材质系统、Uniform 参数、常量缓冲区 |
 
 
 ### 下一步学习方向
