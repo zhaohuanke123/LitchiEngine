@@ -218,13 +218,3 @@ RTTR_REGISTRATION {
 ### 引擎 Wiki
 
 完整的引擎参考手册：[docs/wiki/README.md](docs/wiki/README.md)
-
-### 实习生作业文档
-
-作业文档位于 `docs/homework/` 目录：
-
-| 文档 | 内容概述 |
-|------|----------|
-| [engine_principle_tutorials.md](docs/homework/engine_principle_tutorials.md) | 引擎原理学习教程：通过实践学习引擎原理 |
-| [catlike_style_tutorials.md](docs/homework/catlike_style_tutorials.md) | Catlike Coding 风格教程：渐进式、代码驱动 |
-| [intern_assignments.md](docs/homework/intern_assignments.md) | 实习生扩展开发作业 |

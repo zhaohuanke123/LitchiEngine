@@ -873,14 +873,20 @@ cbuffer BufferFrame : register(b0)
 #include "Common/common.hlsl"
 //====================
 
-// 自定义材质参数（通过常量缓冲区传递）
-cbuffer PulseParams : register(b2)
+// Material Buffer Name Must Be "Material"
+// register(b10) is required by the engine for material constants
+struct MaterialData
 {
-    float3 u_baseColor;    // 基础颜色
-    float u_pulseSpeed;    // 脉冲速度
-    float u_pulseIntensity; // 脉冲强度
-    float3 padding;        // 16字节对齐
-}
+    float3 u_baseColor;      // offset: 0, size: 12
+    float u_pulseSpeed;      // offset: 12, size: 4 (packed after float3)
+    float u_pulseIntensity;  // offset: 16, size: 4 (new 16-byte row)
+    float3 padding;          // offset: 32, size: 12 (padding for 16-byte alignment)
+};
+
+cbuffer Material : register(b10)
+{
+    MaterialData materialData;
+};
 
 struct PixelOutput
 {
@@ -906,17 +912,35 @@ PixelOutput mainPS(Pixel_PosUvNorTan input)
     PixelOutput output;
 
     float time = buffer_frame.frame * buffer_frame.delta_time;
-    float pulse = 0.5 + 0.5 * sin(time * u_pulseSpeed);
-    float intensity = 1.0 - u_pulseIntensity * (1.0 - pulse);
+    float pulse = 0.5 + 0.5 * sin(time * materialData.u_pulseSpeed);
+    float intensity = 1.0 - materialData.u_pulseIntensity * (1.0 - pulse);
 
-    float3 finalColor = u_baseColor * intensity;
+    float3 finalColor = materialData.u_baseColor * intensity;
     output.color = float4(finalColor, 1.0);
 
     return output;
 }
 ```
 
-**注意**: 这里使用了 `register(b2)`，与 `BufferMaterial` 相同。引擎会自动处理材质参数的绑定。
+**重要说明**：
+
+| 要点 | 说明 |
+|------|------|
+| `cbuffer Material` | 缓冲区名称必须为 `Material`，引擎会按名称查找 |
+| `register(b10)` | 引擎为材质参数预留的槽位，必须使用此槽位 |
+| `MaterialData` 结构体 | 包含所有自定义参数，注意16字节对齐 |
+| 成员名称 | 必须与材质 JSON 中的 `name` 一致（如 `u_baseColor`）|
+
+**为什么用 register(b10)？**
+
+LitchiEngine 的常量缓冲区槽位分配：
+
+| 槽位 | 用途 | 说明 |
+|------|------|------|
+| b0 | BufferFrame | 帧数据（时间、分辨率等）|
+| b2 | BufferMaterial | 引擎内置材质参数 |
+| b5 | BufferRendererPath | 渲染路径数据（相机矩阵等）|
+| **b10** | **自定义材质参数** | 用户自定义材质 uniform |
 
 ### 第六步：更新材质文件
 
@@ -1016,33 +1040,76 @@ RHI_ConstantBuffer (GPU 缓冲区)
 
 ### 16字节对齐规则
 
-HLSL 常量缓冲区要求 16 字节对齐：
+HLSL 常量缓冲区要求 16 字节对齐。这是初学者最常遇到的问题！
+
+**正确示例（Pulse.hlsl 中的 MaterialData）**：
 
 ```hlsl
-// 正确 ✓
-cbuffer MyParams
+struct MaterialData
 {
-    float3 color;      // 12 bytes
-    float intensity;   // 4 bytes (填充到 16)
-}
-
-// 错误 ✗
-cbuffer MyParams
-{
-    float3 color;      // 12 bytes
-    float2 speed;      // 8 bytes - 跨越 16 字节边界！
-}
+    float3 u_baseColor;      // offset: 0,  size: 12 bytes
+    float u_pulseSpeed;      // offset: 12, size: 4 bytes  ← 填充到 16 字节边界
+    float u_pulseIntensity;  // offset: 16, size: 4 bytes  ← 新的 16 字节行开始
+    float3 padding;          // offset: 32, size: 12 bytes ← 填充到完整 16 字节
+};
+// Total: 48 bytes (3 × 16)
 ```
 
-**对齐规则**：
+**内存布局图示**：
 
-| 类型 | 大小 | 对齐要求 |
-|------|------|----------|
-| float | 4 bytes | 4 bytes |
-| float2 | 8 bytes | 8 bytes |
-| float3 | 12 bytes | 16 bytes |
-| float4 | 16 bytes | 16 bytes |
-| matrix | 64 bytes | 16 bytes |
+```
+┌────────────────────────────────────────┐
+│ Row 1 (16 bytes)                        │
+│ ├─ u_baseColor.x (4)                    │
+│ ├─ u_baseColor.y (4)                    │
+│ ├─ u_baseColor.z (4)                    │
+│ └─ u_pulseSpeed (4)                     │
+├────────────────────────────────────────┤
+│ Row 2 (16 bytes)                        │
+│ ├─ u_pulseIntensity (4)                 │
+│ ├─ padding.x (4)                        │
+│ ├─ padding.y (4)                        │
+│ └─ padding.z (4)                        │
+└────────────────────────────────────────┘
+```
+
+**常见错误**：
+
+```hlsl
+// 错误 ✗ - float3 后面紧跟 float2，跨越 16 字节边界
+struct BadData
+{
+    float3 color;      // 12 bytes
+    float2 speed;      // 8 bytes - 错误！会从偏移 16 开始
+                       // 但引擎可能从偏移 12 开始写入，导致数据错位
+};
+
+// 正确 ✓ - 添加填充
+struct GoodData
+{
+    float3 color;      // 12 bytes
+    float _pad1;       // 4 bytes - 填充到 16
+    float2 speed;      // 8 bytes (从 16 开始)
+    float2 _pad2;      // 8 bytes - 填充到 32
+};
+```
+
+**对齐规则总结**：
+
+| 类型 | 大小 | 对齐要求 | 打包规则 |
+|------|------|----------|----------|
+| `float` | 4 bytes | 4 bytes | 可以放在任何 4 的倍数位置 |
+| `float2` | 8 bytes | 8 bytes | 必须放在 8 的倍数位置 |
+| `float3` | 12 bytes | **16 bytes** | 必须放在 16 的倍数位置！ |
+| `float4` | 16 bytes | 16 bytes | 必须放在 16 的倍数位置 |
+| `matrix` | 64 bytes | 16 bytes | 每行是一个 float4 |
+
+**实用技巧**：字段排列顺序
+
+1. 先放 `float4` 和 `matrix`（16 字节对齐）
+2. 再放 `float3`（后面留 4 字节给 float）
+3. 再放 `float2`（8 字节对齐）
+4. 最后放 `float`（填充缝隙）
 
 ---
 
@@ -1067,62 +1134,186 @@ namespace LitchiRuntime
     class PulseController : public Component
     {
     public:
-        PulseController() = default;
-        ~PulseController() override = default;
+        PulseController();
+        ~PulseController() override;
 
-        // 可配置参数
-        Vector3 baseColor{0.0f, 0.8f, 0.8f};
-        float pulseSpeed = 3.0f;
-        float pulseIntensity = 0.5f;
+        // Getter/Setter 用于 RTTR 属性绑定
+        Vector3 GetBaseColor() const { return m_baseColor; }
+        void SetBaseColor(Vector3 color) { m_baseColor = color; }
 
+        float GetPulseSpeed() const { return m_pulseSpeed; }
+        void SetPulseSpeed(float speed) { m_pulseSpeed = speed; }
+
+        float GetPulseIntensity() const { return m_pulseIntensity; }
+        void SetPulseIntensity(float intensity) { m_pulseIntensity = intensity; }
+
+        void OnStart() override;
         void OnUpdate() override;
+        void OnEditorUpdate() override;
+
+    private:
+        Vector3 m_baseColor{0.0f, 0.8f, 0.8f};
+        float m_pulseSpeed = 3.0f;
+        float m_pulseIntensity = 0.5f;
 
         RTTR_ENABLE(Component)
     };
 }
 ```
 
+**为什么使用 Getter/Setter？**
+
+| 方式 | 优点 | 缺点 |
+|------|------|------|
+| 直接暴露成员变量 (`public`) | 简单直接 | 无法添加验证逻辑，无法触发回调 |
+| **Getter/Setter** | 可添加验证、支持计算属性、符合封装原则 | 代码略多 |
+
+在 LitchiEngine 中，使用 Getter/Setter 是推荐的做法，因为：
+1. 可以在设置值时添加范围检查
+2. 便于调试（可在 setter 中打断点）
+3. RTTR 完美支持 getter/setter 绑定
+
+### 第八步：实现组件逻辑
+
 **实现文件**: `Engine/Source/Runtime/Function/Framework/Component/Gameplay/PulseController.cpp`
 
 ```cpp
+#include "Runtime/Core/pch.h"
 #include "PulseController.h"
+
 #include "Runtime/Function/Framework/GameObject/GameObject.h"
 #include "Runtime/Function/Framework/Component/Renderer/MeshRenderer.h"
 #include "Runtime/Function/Renderer/Rendering/Material.h"
 
 namespace LitchiRuntime
 {
+    PulseController::PulseController()
+        : m_baseColor(0.0f, 0.8f, 0.8f)
+        , m_pulseSpeed(3.0f)
+        , m_pulseIntensity(0.5f)
+    {
+    }
+
+    PulseController::~PulseController()
+    {
+    }
+
+    void PulseController::OnStart()
+    {
+        // OnStart 在场景开始时调用一次
+        // 可以在这里做初始化检查
+        MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
+        if (!renderer)
+        {
+            // 记录警告：没有 MeshRenderer 组件
+            return;
+        }
+
+        Material* material = renderer->GetMaterial();
+        if (!material)
+        {
+            // 记录警告：没有材质
+            return;
+        }
+
+        // 可以在这里检查材质是否有需要的 uniform 参数
+    }
+
     void PulseController::OnUpdate()
     {
-        // 获取 MeshRenderer 组件
+        // OnUpdate 在运行模式下每帧调用
         MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
         if (!renderer) return;
 
-        // 获取材质
         Material* material = renderer->GetMaterial();
         if (!material) return;
 
         // 更新材质参数
-        material->SetValue("u_baseColor", baseColor);
-        material->SetValue("u_pulseSpeed", pulseSpeed);
-        material->SetValue("u_pulseIntensity", pulseIntensity);
+        material->SetValue("u_baseColor", m_baseColor);
+        material->SetValue("u_pulseSpeed", m_pulseSpeed);
+        material->SetValue("u_pulseIntensity", m_pulseIntensity);
+    }
+
+    void PulseController::OnEditorUpdate()
+    {
+        // OnEditorUpdate 在编辑器模式下每帧调用
+        // 这样即使不点击 Play，也能在编辑器中预览效果
+        MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
+        if (!renderer) return;
+
+        Material* material = renderer->GetMaterial();
+        if (!material) return;
+
+        material->SetValue("u_baseColor", m_baseColor);
+        material->SetValue("u_pulseSpeed", m_pulseSpeed);
+        material->SetValue("u_pulseIntensity", m_pulseIntensity);
     }
 }
 ```
 
-### 第八步：注册组件
+**生命周期方法说明**：
 
-**TypeRegister.h**:
+| 方法 | 调用时机 | 用途 |
+|------|----------|------|
+| `OnStart()` | 场景开始时调用一次 | 初始化、检查依赖 |
+| `OnUpdate()` | **运行模式**下每帧调用 | 游戏逻辑 |
+| `OnEditorUpdate()` | **编辑器模式**下每帧调用 | 编辑器预览效果 |
 
+### 第九步：注册组件到 RTTR
+
+**文件路径**: `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h`
+
+1. 在文件顶部添加 include：
+```cpp
+#include "Runtime/Function/Framework/Component/Gameplay/PulseController.h"
+```
+
+2. 在 `Framework Object Types` 区域添加注册：
 ```cpp
 rttr::registration::class_<PulseController>("PulseController")
     .constructor<>()(rttr::policy::ctor::as_raw_ptr)
-    .property("baseColor", &PulseController::baseColor)
-    .property("pulseSpeed", &PulseController::pulseSpeed)
-    .property("pulseIntensity", &PulseController::pulseIntensity);
+    .property("baseColor", &PulseController::GetBaseColor, &PulseController::SetBaseColor)
+    .property("pulseSpeed", &PulseController::GetPulseSpeed, &PulseController::SetPulseSpeed)
+    .property("pulseIntensity", &PulseController::GetPulseIntensity, &PulseController::SetPulseIntensity);
 ```
 
-**Inspector.cpp**: 添加到组件选择器（参考教程 1 的步骤）。
+**注意**：使用 getter/setter 绑定时，`.property()` 接受三个参数：
+- 属性名（显示在 Inspector 中）
+- Getter 方法指针
+- Setter 方法指针
+
+### 第十步：在 Inspector 中注册组件
+
+**文件路径**: `Engine/Source/Editor/source/Panels/Inspector.cpp`
+
+1. 在文件顶部添加 include：
+```cpp
+#include "Runtime/Function/Framework/Component/Gameplay/PulseController.h"
+```
+
+2. 找到 `componentSelectorWidget.choices` 的定义位置（约第 80 行），添加：
+```cpp
+componentSelectorWidget.choices.emplace(18, "PulseController");
+```
+
+3. 在 `addComponentButton.ClickedEvent` 的 switch 语句中添加：
+```cpp
+case 18: GetTargetActor()->AddComponent<PulseController>(); break;
+```
+
+4. 在 `componentSelectorWidget.ValueChangedEvent` 的 switch 语句中添加：
+```cpp
+case 18: defineButtonsStates(GetTargetActor()->GetComponent<PulseController>()); return;
+```
+
+**完整修改位置**：
+
+| 位置 | 作用 |
+|------|------|
+| 头文件 include | 让编译器知道 PulseController 类型 |
+| choices.emplace | 在下拉列表中显示选项 |
+| switch case (ClickedEvent) | 点击按钮时创建组件 |
+| switch case (ValueChangedEvent) | 检查组件是否已存在，禁用按钮 |
 
 ---
 
@@ -1131,8 +1322,63 @@ rttr::registration::class_<PulseController>("PulseController")
 - [ ] 着色器编译无错误
 - [ ] 材质文件正确加载
 - [ ] 物体显示脉冲发光效果
-- [ ] Inspector 中可调整材质参数
+- [ ] Inspector 中可调整 PulseController 参数
 - [ ] PulseController 组件能动态控制效果
+- [ ] 编辑器模式下也能预览脉冲效果（OnEditorUpdate）
+
+---
+
+## 常见问题排查
+
+### 着色器编译问题
+
+| 问题 | 可能原因 | 解决方案 |
+|------|----------|----------|
+| 材质参数不生效 | cbuffer 名称错误 | 必须命名为 `Material` |
+| 数据错位 | register 槽位错误 | 必须使用 `register(b10)` |
+| 变量未定义 | 成员名与 JSON 不匹配 | 确保 HLSL 变量名与 JSON 中 `name` 一致 |
+
+### 组件问题
+
+| 问题 | 可能原因 | 解决方案 |
+|------|----------|----------|
+| 组件不显示在列表中 | RTTR 注册失败 | 检查 TypeRegister.h 中的注册 |
+| 材质参数不更新 | OnUpdate/OnEditorUpdate 未调用 | 检查组件是否激活 |
+| 属性不显示在 Inspector | 未正确绑定 getter/setter | 确保 `.property()` 参数正确 |
+
+### 调试技巧
+
+在 `OnStart()` 中添加调试日志，检查材质和 uniform 信息：
+
+```cpp
+void PulseController::OnStart()
+{
+    MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
+    if (!renderer) return;
+
+    Material* material = renderer->GetMaterial();
+    if (!material) return;
+
+    // 打印所有 uniform 参数
+    auto& uniforms = material->GetUniformsData();
+    for (auto& pair : uniforms)
+    {
+        DEBUG_LOG_INFO("Uniform: {} type: {}", pair.first, pair.second.type().name());
+    }
+
+    // 打印着色器的 uniform 信息
+    auto shader = material->GetShader();
+    if (shader)
+    {
+        auto& globalUniforms = shader->GetGlobalShaderUniformDict();
+        for (auto& pair : globalUniforms)
+        {
+            DEBUG_LOG_INFO("Shader uniform: {} offset: {} size: {}",
+                pair.first, pair.second.location, pair.second.size);
+        }
+    }
+}
+```
 
 ---
 
@@ -1143,19 +1389,25 @@ rttr::registration::class_<PulseController>("PulseController")
 | 知识点 | 说明 |
 |--------|------|
 | 着色器结构 | 顶点着色器 + 像素着色器 |
-| 常量缓冲区 | GPU 数据传递机制 |
+| 常量缓冲区 | GPU 数据传递机制，必须使用 `register(b10)` 和 `Material` 名称 |
 | 材质文件 | JSON 格式的材质配置 |
-| Uniform 参数 | 着色器可配置参数 |
-| Material 类 | 运行时材质管理 |
+| Uniform 参数 | 着色器可配置参数，名称必须一致 |
+| Material 类 | 运行时材质管理，`SetValue()` 更新参数 |
 | 16字节对齐 | HLSL 缓冲区对齐规则 |
+| Getter/Setter | RTTR 属性绑定的推荐方式 |
+| OnEditorUpdate | 编辑器模式预览效果 |
 
 ### 创建自定义着色器的完整流程
 
 1. **编写着色器** - 在 `Engine/Data/Engine/Shaders/` 创建 .hlsl 文件
+   - 使用 `cbuffer Material : register(b10)` 定义材质参数
+   - 参数名与材质 JSON 中一致
 2. **创建材质** - 在 `Engine/Data/Engine/Materials/` 创建 .mat 文件
-3. **配置参数** - 在材质 JSON 中定义 uniform 参数
-4. **使用材质** - 在 MeshRenderer 中设置材质路径
-5. **运行时控制** - 通过组件动态修改材质参数
+   - 定义 uniformInfoList 参数
+3. **创建控制器组件** - 继承 Component，实现 OnUpdate 和 OnEditorUpdate
+4. **注册组件** - 在 TypeRegister.h 中注册 RTTR
+5. **注册 Inspector** - 在 Inspector.cpp 中添加组件选择器入口
+6. **测试验证** - 编译运行，检查效果
 
 ---
 
@@ -1241,7 +1493,7 @@ LitchiEngine 选择 HLSL + DXCompiler 方案，可以：
 
 ---
 
-**文档时间**: 2026-04-12
+**文档时间**: 2026-04-14
 **风格参考**: Catlike Coding (https://catlikecoding.com/)
 
 
