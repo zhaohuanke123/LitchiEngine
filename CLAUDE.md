@@ -173,11 +173,39 @@ RTTR_REGISTRATION {
 
 ## 关键文件路径
 
-| 模块 | 路径 |
-|------|------|
-| RHI 接口 | `Engine/Source/Runtime/Function/Renderer/RHI/` |
-| Vulkan 后端 | `Engine/Source/Runtime/Function/Renderer/RHI/Vulkan/` |
-| 渲染器 | `Engine/Source/Runtime/Function/Renderer/Rendering/` |
 | 组件基类 | `Engine/Source/Runtime/Function/Framework/Component/Base/` |
 | 数学库 | `Engine/Source/Runtime/Core/Math/` |
 | 事件系统 | `Engine/Source/Runtime/Core/Tools/Eventing/` |
+
+## 项目文档
+
+### 引擎分析文档
+
+详细分析文档位于 `docs/analysis/` 目录：
+
+| 文档 | 内容概述 |
+|------|----------|
+| [01_core_module.md](docs/analysis/01_core_module.md) | Core 模块架构：数学库、反射系统、事件系统、窗口管理 |
+| [02_rhi_abstraction.md](docs/analysis/02_rhi_abstraction.md) | RHI 抽象层设计：设备接口、命令列表、管线状态 |
+| [03_vulkan_backend.md](docs/analysis/03_vulkan_backend.md) | Vulkan 后端实现：设备初始化、管线创建、着色器编译 |
+| [04_rendering_pipeline.md](docs/analysis/04_rendering_pipeline.md) | 渲染管线：Shadow Pass、Forward Pass、PBR 材质 |
+| [05_script_system.md](docs/analysis/05_script_system.md) | 脚本系统：Mono 运行时、C++/C# 互操作、生命周期 |
+| [06_component_system.md](docs/analysis/06_component_system.md) | 组件系统：GameObject、Component、Transform |
+| [07_scene_management.md](docs/analysis/07_scene_management.md) | 场景管理：Scene、SceneManager、Prefab |
+| [08_resource_management.md](docs/analysis/08_resource_management.md) | 资源管理：ResourceManager、AssetManager、序列化 |
+| [09_shader_system.md](docs/analysis/09_shader_system.md) | 着色器系统：HLSL、常量缓冲区、DXCompiler |
+| [10_editor_architecture.md](docs/analysis/10_editor_architecture.md) | 编辑器架构：面板系统、Inspector、Hierarchy |
+| [11_physics_system.md](docs/analysis/11_physics_system.md) | 物理系统：PhysX 集成、Collider、RigidActor |
+| [12_animation_system.md](docs/analysis/12_animation_system.md) | 动画系统：骨骼动画、Animator、蒙皮渲染 |
+| [13_ui_system.md](docs/analysis/13_ui_system.md) | UI 系统：ImGui 集成、UI 组件 |
+| [14_code_standards.md](docs/analysis/14_code_standards.md) | 代码规范：命名约定、设计模式、扩展流程 |
+| [15_catlike_coding_style.md](docs/analysis/15_catlike_coding_style.md) | Catlike Coding 教学风格调研 |
+| [16_editor_play_mode.md](docs/analysis/16_editor_play_mode.md) | 编辑器运行模式：Play/Pause/Stop 状态机 |
+
+### 实习生作业文档
+
+作业文档位于 `docs/homework/` 目录：
+
+| 文档 | 内容概述 |
+|------|----------|
+| [catlike_style_tutorials.md](docs/homework/catlike_style_tutorials.md) | Catlike Coding 风格教程：渐进式、代码驱动 |

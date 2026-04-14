@@ -374,6 +374,39 @@
 
 ---
 
+## [2026-04-14] - Task #20: 分析着色器与材质管理系统
+
+### What was done:
+- 分析了 Material 类的设计：
+  - 核心数据结构：m_materialRes（序列化）、m_uniformDataList（类型擦除值存储）、m_valueConstantBuffer（GPU 缓冲）
+  - UniformInfo 类型系统：支持 Bool、Int、Float、Vector2/3/4、Texture
+  - 核心方法：SetValue/GetValue（模板方法）、SetTexture、SyncToDataBuffer
+- 分析了 MaterialShader 类的设计：
+  - 着色器组合器：管理 VS/PS 配对
+  - 描述符反射：从 SPIR-V 提取 Material cbuffer 结构和纹理绑定
+  - 槽位分配策略：材质纹理 t100+（实际 500+），材质常量缓冲 b10
+- 分析了 MaterialManager：
+  - 继承 AResourceManager 模板基类
+  - 实现 CreateResource、DestroyResource、ReloadResource
+- 分析了 Uniform 数据流：
+  - 编辑器 SetValue → m_uniformDataList → SyncToDataBuffer → m_value 内存 → RHI_ConstantBuffer → GPU
+  - 脏标记机制：m_isValueDirty 实现延迟同步
+- 分析了纹理绑定机制：
+  - 通过槽位范围区分材质纹理（slot >= 500）
+  - PBR 纹理映射：Color→u_albedo、Roughness→u_roughness 等
+- 总结了设计模式：资源管理模式、类型擦除、反射机制、脏标记模式、组合模式
+
+### Testing:
+- 文档输出: docs/analysis/17_shader_material_system.md
+
+### Notes:
+- Material 存储实例数据，MaterialShader 存储类型信息，多个 Material 可共享同一个 MaterialShader
+- 使用 std::any 实现类型擦除，支持多种 Uniform 类型
+- 持久映射 ConstantBuffer 避免每帧映射开销
+- 材质系统已支持自定义着色器，只需定义 cbuffer Material : register(b10)
+
+---
+
 ## 已完成任务
 
 ### 分析任务 (Analysis Tasks)
@@ -414,4 +447,9 @@
 - `docs/analysis/12_animation_system.md` - 动画系统分析
 - `docs/analysis/13_ui_system.md` - UI 系统分析
 - `docs/analysis/14_code_standards.md` - 代码规范总结
+- `docs/analysis/15_catlike_coding_style.md` - Catlike Coding 教学风格调研
+- `docs/analysis/16_editor_play_mode.md` - 编辑器运行模式分析
+- `docs/analysis/17_shader_material_system.md` - 着色器与材质管理系统分析
 - `docs/homework/intern_assignments.md` - 实习生扩展开发作业
+- `docs/homework/catlike_style_tutorials.md` - Catlike Coding 风格教程
+- `docs/homework/engine_principle_tutorials.md` - 引擎原理学习教程

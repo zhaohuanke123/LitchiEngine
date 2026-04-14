@@ -534,15 +534,8 @@
       "dependencies": [
         10
       ],
-      "passes": false,
       "blocked": false,
       "blocked_reason": "",
-      "validation_notes": [
-        "需分析 EditorActions 类的播放控制方法",
-        "需理解 ApplicationEditor 的状态管理",
-        "需分析场景在运行时的复制机制",
-        "需理解脚本生命周期的触发时机"
-      ],
       "output_file": "docs/analysis/16_editor_play_mode.md",
       "category": "analysis",
       "key_questions": [
@@ -560,6 +553,152 @@
         "覆盖了组件生命周期触发时机",
         "覆盖了场景备份恢复机制"
       ]
+    },
+    {
+      "id": 20,
+      "title": "分析着色器与材质管理系统",
+      "description": "深入分析着色器与材质管理系统的设计和实现。理解 Material、MaterialShader、MaterialManager 之间的关系，着色器如何与材质绑定，Uniform 数据如何传递到 GPU。",
+      "steps": [
+        "分析 Material 类的设计：属性存储、Uniform 管理、纹理绑定",
+        "分析 MaterialShader 类：着色器组合、描述符管理、全局 Uniform",
+        "分析 MaterialManager：材质加载、缓存、序列化",
+        "理解 Material 与 RHI_Shader 的绑定机制",
+        "分析 Uniform 数据如何打包并传递到 GPU (ConstantBuffer)",
+        "理解材质属性标志 (MaterialProperty, MaterialTexture) 的使用",
+        "总结材质系统的扩展方式和最佳实践"
+      ],
+      "priority": "high",
+      "dependencies": [
+        8,
+        9
+      ],
+      "passes": true,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "分析文档已生成: docs/analysis/17_shader_material_system.md",
+        "覆盖了 Material 类的核心设计和实现",
+        "覆盖了 MaterialShader 的描述符管理机制",
+        "覆盖了 MaterialManager 的资源管理流程",
+        "分析了 Uniform 数据从编辑器到 GPU 的完整流程",
+        "分析了纹理绑定机制和槽位分配策略",
+        "总结了设计模式和扩展指南"
+      ],
+      "output_file": "docs/analysis/17_shader_material_system.md",
+      "category": "analysis",
+      "key_questions": [
+        "Material 和 MaterialShader 的职责如何划分？",
+        "Uniform 数据是如何从编辑器传递到 GPU 的？",
+        "材质如何支持自定义着色器？",
+        "纹理是如何绑定到着色器的？"
+      ]
+    },
+    {
+      "id": 21,
+      "title": "分析输入系统",
+      "description": "深入分析输入系统的设计和实现，包括键盘、鼠标输入的处理机制。",
+      "steps": [
+        "分析 InputManager 类的设计：初始化、事件监听、状态管理",
+        "理解键盘输入处理：按键状态、按下/释放事件",
+        "理解鼠标输入处理：位置、移动、滚轮、按钮状态",
+        "分析输入事件与 GLFW 窗口的集成",
+        "总结输入系统的使用方式和扩展点"
+      ],
+      "priority": "medium",
+      "dependencies": [],
+      "passes": false,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "需分析 InputManager.h/cpp 的实现",
+        "需理解键盘和鼠标的状态管理",
+        "需总结输入 API 的使用方式"
+      ],
+      "output_file": "docs/analysis/18_input_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 22,
+      "title": "分析序列化系统",
+      "description": "深入分析序列化系统的设计和实现，理解对象如何被序列化和反序列化。",
+      "steps": [
+        "分析 Serializer 类的设计：JSON 序列化/反序列化",
+        "理解 RTTR 反射与序列化的集成",
+        "分析场景序列化：GameObject、Component 的序列化",
+        "分析资源序列化：Material、Prefab 等的序列化",
+        "总结序列化系统的使用规范和扩展方式"
+      ],
+      "priority": "medium",
+      "dependencies": [
+        1
+      ],
+      "passes": false,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "需分析 serializer.h/cpp 的实现",
+        "需理解 JSON 序列化流程",
+        "需总结可序列化类型的要求"
+      ],
+      "output_file": "docs/analysis/19_serialization_system.md",
+      "category": "analysis"
+    },
+    {
+      "id": 23,
+      "title": "分析应用程序框架",
+      "description": "深入分析应用程序框架的设计，理解引擎的启动流程和主循环。",
+      "steps": [
+        "分析 ApplicationBase 类的设计：初始化、主循环、关闭",
+        "理解应用程序生命周期管理",
+        "分析编辑器应用 (EditorApplication) 与独立应用 (Standalone) 的差异",
+        "理解服务定位器 (ServiceLocator) 的使用",
+        "总结应用程序框架的设计模式"
+      ],
+      "priority": "medium",
+      "dependencies": [],
+      "passes": false,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "需分析 ApplicationBase.h/cpp 的实现",
+        "需理解主循环的设计",
+        "需总结应用程序扩展点"
+      ],
+      "output_file": "docs/analysis/20_application_framework.md",
+      "category": "analysis"
+    },
+    {
+      "id": 24,
+      "title": "生成引擎 Wiki 文档",
+      "description": "整合所有分析文档，生成一个完整的 Wiki 文档，作为引擎的完整参考手册。Wiki 应包含架构概览、各系统详解、API 参考、开发指南等。",
+      "steps": [
+        "设计 Wiki 文档结构：目录、章节、索引",
+        "整合现有分析文档内容",
+        "补充系统间的关联说明",
+        "添加快速入门指南",
+        "添加常见问题解答 (FAQ)",
+        "生成完整的 Wiki 文档"
+      ],
+      "priority": "high",
+      "dependencies": [
+        14,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "passes": false,
+      "blocked": false,
+      "blocked_reason": "",
+      "validation_notes": [
+        "Wiki 需包含完整的目录结构",
+        "Wiki 需包含各系统的详细说明",
+        "Wiki 需包含快速入门指南",
+        "Wiki 需包含常见问题解答"
+      ],
+      "output_file": "docs/wiki/README.md",
+      "category": "documentation"
     }
   ]
 }
