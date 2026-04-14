@@ -96,7 +96,15 @@ OnAwake() → OnEnable() → OnStart() → OnUpdate() → OnDisable() → OnDest
 1. 继承 `Component` 或其子类
 2. 重写生命周期方法
 3. 添加 RTTR 注册
-4. 在 `Engine/Source/Runtime/CMakeLists.txt` 添加源文件
+4. 在 `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h` 中添加 include 和 RTTR 注册
+5. 在 `Engine/Source/Runtime/CMakeLists.txt` 添加源文件
+
+### 序列化系统
+
+基于 RTTR 反射的 JSON 序列化：
+- `Serializer::SerializeToJson()` / `DeserializeFromJson()` - 核心序列化方法
+- 多态类型使用 `Polymorphic` 元数据标记
+- 对象引用通过 ID 机制实现，避免指针序列化
 
 ### 命名空间
 
@@ -176,6 +184,7 @@ RTTR_REGISTRATION {
 | 组件基类 | `Engine/Source/Runtime/Function/Framework/Component/Base/` |
 | 数学库 | `Engine/Source/Runtime/Core/Math/` |
 | 事件系统 | `Engine/Source/Runtime/Core/Tools/Eventing/` |
+| RTTR 类型注册 | `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h` |
 
 ## 项目文档
 
@@ -201,6 +210,14 @@ RTTR_REGISTRATION {
 | [14_code_standards.md](docs/analysis/14_code_standards.md) | 代码规范：命名约定、设计模式、扩展流程 |
 | [15_catlike_coding_style.md](docs/analysis/15_catlike_coding_style.md) | Catlike Coding 教学风格调研 |
 | [16_editor_play_mode.md](docs/analysis/16_editor_play_mode.md) | 编辑器运行模式：Play/Pause/Stop 状态机 |
+| [17_shader_material_system.md](docs/analysis/17_shader_material_system.md) | 着色器与材质管理：Material、MaterialShader |
+| [18_input_system.md](docs/analysis/18_input_system.md) | 输入系统：InputManager、键盘鼠标处理 |
+| [19_serialization_system.md](docs/analysis/19_serialization_system.md) | 序列化系统：RTTR 反射、JSON 序列化、多态支持 |
+| [20_application_framework.md](docs/analysis/20_application_framework.md) | 应用程序框架：生命周期、ServiceLocator |
+
+### 引擎 Wiki
+
+完整的引擎参考手册：[docs/wiki/README.md](docs/wiki/README.md)
 
 ### 实习生作业文档
 
@@ -208,4 +225,6 @@ RTTR_REGISTRATION {
 
 | 文档 | 内容概述 |
 |------|----------|
+| [engine_principle_tutorials.md](docs/homework/engine_principle_tutorials.md) | 引擎原理学习教程：通过实践学习引擎原理 |
 | [catlike_style_tutorials.md](docs/homework/catlike_style_tutorials.md) | Catlike Coding 风格教程：渐进式、代码驱动 |
+| [intern_assignments.md](docs/homework/intern_assignments.md) | 实习生扩展开发作业 |
