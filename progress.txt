@@ -374,39 +374,36 @@
 
 ---
 
-## [2026-04-13] - 新增任务：着色器管理与材质绑定机制分析
+## [2026-04-14] - Task #20: 分析着色器与材质管理系统
 
 ### What was done:
-- 新增任务 #20：深入分析着色器管理与材质绑定机制
-- 任务依赖关系：#20 依赖 #9 (着色器系统分析)
-
-### Notes:
-- 现有着色器分析 (Task #9) 侧重于 HLSL 代码层面
-- 新任务侧重于 C++ 端的着色器管理机制
-- 关键问题：MaterialShader 类设计、SPIR-V 反射、Uniform 系统、描述符绑定约定
-
----
-
-## [2026-04-13] - Task #20: 深入分析着色器管理与材质绑定机制
-
-### What was done:
-- 分析了 MaterialShader 类设计：着色器组合、加载流程、描述符提取
-- 分析了 ShaderUniform 结构：类型、名称、偏移、大小
-- 分析了 SPIR-V 反射机制：spirv_cross 提取 cbuffer 成员和纹理描述符
-- 分析了 Material 类：Uniform 数据存储、GPU 缓冲同步、纹理映射
-- 分析了描述符绑定约定：材质 cbuffer 必须使用 register(b10)、纹理使用 t100+
-- 分析了材质文件格式：JSON 序列化、UniformInfo 类型系统
-- 分析了 CheckIsMaterialDescriptor 函数：slot >= 500 或 slot == 210 判断材质
+- 分析了 Material 类的设计：
+  - 核心数据结构：m_materialRes（序列化）、m_uniformDataList（类型擦除值存储）、m_valueConstantBuffer（GPU 缓冲）
+  - UniformInfo 类型系统：支持 Bool、Int、Float、Vector2/3/4、Texture
+  - 核心方法：SetValue/GetValue（模板方法）、SetTexture、SyncToDataBuffer
+- 分析了 MaterialShader 类的设计：
+  - 着色器组合器：管理 VS/PS 配对
+  - 描述符反射：从 SPIR-V 提取 Material cbuffer 结构和纹理绑定
+  - 槽位分配策略：材质纹理 t100+（实际 500+），材质常量缓冲 b10
+- 分析了 MaterialManager：
+  - 继承 AResourceManager 模板基类
+  - 实现 CreateResource、DestroyResource、ReloadResource
+- 分析了 Uniform 数据流：
+  - 编辑器 SetValue → m_uniformDataList → SyncToDataBuffer → m_value 内存 → RHI_ConstantBuffer → GPU
+  - 脏标记机制：m_isValueDirty 实现延迟同步
+- 分析了纹理绑定机制：
+  - 通过槽位范围区分材质纹理（slot >= 500）
+  - PBR 纹理映射：Color→u_albedo、Roughness→u_roughness 等
+- 总结了设计模式：资源管理模式、类型擦除、反射机制、脏标记模式、组合模式
 
 ### Testing:
-- 文档输出: docs/analysis/17_shader_material_binding.md
+- 文档输出: docs/analysis/17_shader_material_system.md
 
 ### Notes:
-- 材质 cbuffer 必须命名为 "Material" 才能被识别
-- 未使用的纹理会被编译器优化掉，导致反射时找不到
-- DXCompiler 通过 -fvk-b-shift/t-shift 参数实现 HLSL slot 到 SPIR-V binding 的映射
-- Uniform 数据通过 std::any 类型擦除统一存储
-- 脏标记模式用于延迟更新 GPU 数据
+- Material 存储实例数据，MaterialShader 存储类型信息，多个 Material 可共享同一个 MaterialShader
+- 使用 std::any 实现类型擦除，支持多种 Uniform 类型
+- 持久映射 ConstantBuffer 避免每帧映射开销
+- 材质系统已支持自定义着色器，只需定义 cbuffer Material : register(b10)
 
 ---
 
@@ -450,4 +447,9 @@
 - `docs/analysis/12_animation_system.md` - 动画系统分析
 - `docs/analysis/13_ui_system.md` - UI 系统分析
 - `docs/analysis/14_code_standards.md` - 代码规范总结
+- `docs/analysis/15_catlike_coding_style.md` - Catlike Coding 教学风格调研
+- `docs/analysis/16_editor_play_mode.md` - 编辑器运行模式分析
+- `docs/analysis/17_shader_material_system.md` - 着色器与材质管理系统分析
 - `docs/homework/intern_assignments.md` - 实习生扩展开发作业
+- `docs/homework/catlike_style_tutorials.md` - Catlike Coding 风格教程
+- `docs/homework/engine_principle_tutorials.md` - 引擎原理学习教程
