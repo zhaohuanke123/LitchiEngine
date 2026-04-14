@@ -606,13 +606,16 @@
       ],
       "priority": "medium",
       "dependencies": [],
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "blocked_reason": "",
       "validation_notes": [
-        "需分析 InputManager.h/cpp 的实现",
-        "需理解键盘和鼠标的状态管理",
-        "需总结输入 API 的使用方式"
+        "分析文档已生成: docs/analysis/18_input_system.md",
+        "覆盖了 InputManager 类的核心设计",
+        "分析了键盘输入的事件驱动和状态轮询两种查询方式",
+        "分析了鼠标位置、增量、滚轮的处理机制",
+        "分析了输入事件与 GLFW 窗口的集成流程",
+        "总结了输入系统的扩展方式（手柄支持、C# 脚本绑定）"
       ],
       "output_file": "docs/analysis/18_input_system.md",
       "category": "analysis"
@@ -632,13 +635,16 @@
       "dependencies": [
         1
       ],
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "blocked_reason": "",
       "validation_notes": [
-        "需分析 serializer.h/cpp 的实现",
-        "需理解 JSON 序列化流程",
-        "需总结可序列化类型的要求"
+        "分析文档已生成: docs/analysis/19_serialization_system.md",
+        "覆盖了 Serializer 类的核心设计",
+        "分析了 RTTR 反射与序列化的集成机制",
+        "分析了多态序列化的实现（Polymorphic 元数据）",
+        "分析了场景/GameObject 的 ID 引用机制",
+        "总结了可序列化类型的扩展方式"
       ],
       "output_file": "docs/analysis/19_serialization_system.md",
       "category": "analysis"
@@ -656,13 +662,15 @@
       ],
       "priority": "medium",
       "dependencies": [],
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "blocked_reason": "",
       "validation_notes": [
-        "需分析 ApplicationBase.h/cpp 的实现",
-        "需理解主循环的设计",
-        "需总结应用程序扩展点"
+        "分析文档已生成: docs/analysis/20_application_framework.md",
+        "覆盖了 ApplicationBase 的生命周期设计",
+        "分析了编辑器与独立应用的差异",
+        "分析了 ServiceLocator 的实现机制",
+        "总结了应用程序框架的设计模式"
       ],
       "output_file": "docs/analysis/20_application_framework.md",
       "category": "analysis"
@@ -688,14 +696,16 @@
         22,
         23
       ],
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "blocked_reason": "",
       "validation_notes": [
-        "Wiki 需包含完整的目录结构",
-        "Wiki 需包含各系统的详细说明",
-        "Wiki 需包含快速入门指南",
-        "Wiki 需包含常见问题解答"
+        "Wiki 文档已生成: docs/wiki/README.md",
+        "包含完整目录结构（10个主要章节）",
+        "包含各系统的详细说明和链接",
+        "包含快速入门指南（环境要求、构建步骤）",
+        "包含常见问题解答（FAQ）",
+        "包含学习资源索引"
       ],
       "output_file": "docs/wiki/README.md",
       "category": "documentation"

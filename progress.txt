@@ -407,6 +407,121 @@
 
 ---
 
+## [2026-04-14] - Task #21: 分析输入系统
+
+### What was done:
+- 分析了 InputManager 类的设计：
+  - 静态类设计，提供全局访问点
+  - 初始化时订阅 Window 的输入事件
+  - 使用 ListenerID 管理事件订阅
+- 分析了键盘输入处理：
+  - 两种查询方式：事件驱动（IsKeyPressed/IsKeyReleased）和状态轮询（GetKeyState）
+  - 事件驱动方式只检测帧内发生的事件
+  - 状态轮询方式返回按键的当前物理状态
+- 分析了鼠标输入处理：
+  - 位置追踪：每帧更新 m_mousePosition 和 m_mouseDelta
+  - 滚轮处理：通过 ScrollMoveEvent 回调
+  - 编辑器视口支持：通过 m_editorViewportOffset 计算相对位置
+- 分析了输入事件与 GLFW 窗口的集成：
+  - Window 类绑定 GLFW 回调（glfwSetKeyCallback、glfwSetMouseButtonCallback 等）
+  - 通过 Event 系统将 GLFW 事件转发给 InputManager
+- 总结了输入系统的扩展方式：
+  - 手柄输入支持：需要定义枚举、绑定 GLFW 回调、添加查询接口
+  - C# 脚本绑定：需要定义 KeyCode 枚举、注册 InternalCalls
+
+### Testing:
+- 文档输出: docs/analysis/18_input_system.md
+
+### Notes:
+- 输入系统采用事件驱动架构，通过观察者模式解耦
+- 支持事件查询和状态轮询两种输入检测方式
+- C# 脚本端的 Input 类尚未完全实现
+- 手柄输入目前未支持
+
+---
+
+## [2026-04-14] - Task #22: 分析序列化系统
+
+### What was done:
+- 分析了 Serializer 类的设计：
+  - 两个核心方法：`SerializeToJson()` 和 `DeserializeFromJson()`
+  - 递归遍历对象属性树进行深度序列化
+- 分析了 RTTR 反射与序列化的集成：
+  - 基于 RTTR 运行时反射，无需手写序列化代码
+  - 支持原子类型、枚举、字符串、容器、嵌套对象
+- 分析了多态序列化机制：
+  - 通过 `Polymorphic` 元数据标记多态类型
+  - 序列化时自动注入 `Type` 字段记录实际派生类名称
+  - 反序列化时动态创建正确类型
+- 分析了场景/GameObject 序列化：
+  - 使用 ID 引用机制：`m_id` + `m_parentId` 重建对象层级关系
+  - 避免直接序列化指针，解决循环引用问题
+- 总结了元数据控制系统：`Polymorphic`、`NO_SERIALIZE`、`AssetPath`、`Serializable`
+
+### Testing:
+- 文档输出: docs/analysis/19_serialization_system.md
+
+### Notes:
+- 序列化系统基于 RTTR 反射驱动，支持多态类型
+- 使用 ID 引用机制解决对象引用问题
+- AssetManager 提供统一的资源序列化接口
+
+---
+
+## [2026-04-14] - Task #23: 分析应用程序框架
+
+### What was done:
+- 分析了 ApplicationBase 类的设计：
+  - 抽象基类定义统一的生命周期接口
+  - 初始化、主循环、关闭三阶段生命周期
+- 分析了应用程序生命周期管理：
+  - 精心设计的初始化顺序：路径 → 配置 → 资源 → 窗口 → 渲染
+  - 主循环结构：PollEvents → Update → Render → ClearEvents
+- 分析了编辑器与独立应用的差异：
+  - Editor: 多视图、ImGui UI、编辑/播放模式切换
+  - Standalone: 单视图、直接加载、仅播放模式
+- 分析了 ServiceLocator 的实现：
+  - 使用 `std::any` 实现类型擦除
+  - 通过 `typeid(T).hash_code()` 作为键
+  - 提供宏 `OVSERVICE(Type)` 简化访问
+- 总结了设计模式：模板方法、单例、服务定位器、工厂方法、策略模式
+
+### Testing:
+- 文档输出: docs/analysis/20_application_framework.md
+
+### Notes:
+- ApplicationBase 使用模板方法模式定义生命周期骨架
+- ServiceLocator 解耦模块间依赖
+- 编辑器支持 EDIT/PLAY/PAUSE/FRAME_BY_FRAME 四种模式
+
+---
+
+## [2026-04-14] - Task #24: 生成引擎 Wiki 文档
+
+### What was done:
+- 设计 Wiki 文档结构：10 个主要章节
+  - 快速入门、架构概览、核心系统、渲染系统、功能系统
+  - 资源管理、编辑器、开发指南、常见问题、学习资源
+- 整合所有分析文档内容：
+  - 每个系统都有概述和详细文档链接
+  - 包含代码示例和使用说明
+- 添加快速入门指南：
+  - 环境要求、构建步骤、项目结构
+- 添加常见问题解答：
+  - 编译问题、运行时问题、扩展问题
+- 添加学习资源索引：
+  - 所有分析文档的完整索引表
+
+### Testing:
+- 文档输出: docs/wiki/README.md
+
+### Notes:
+- Wiki 文档作为引擎的完整参考手册
+- 所有分析文档都有对应章节和链接
+- 提供了代码示例和最佳实践
+
+---
+
 ## 已完成任务
 
 ### 分析任务 (Analysis Tasks)
