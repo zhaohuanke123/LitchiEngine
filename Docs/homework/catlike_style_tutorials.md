@@ -19,7 +19,7 @@
 | 系列 | 教程 | 难度 | 前置要求 |
 |------|------|------|----------|
 | 引擎基础 | 教程 1: 组件系统入门 | 入门 | 无 |
-| 渲染入门 | 教程 2: 自定义着色器 | 进阶 | 教程 1 |
+| 渲染原理 | 教程 2: 追踪一次 Draw Call | 进阶 | 教程 1 |
 
 ### 开发环境要求
 
@@ -598,787 +598,505 @@ RTTR_REGISTRATION
 
 ---
 
-# 教程 2：自定义着色器 - 脉冲发光效果
+# 教程 2：追踪一次 Draw Call - 理解渲染管线
 
 ## 概述
 
-通过创建一个自定义着色器和材质，学习 LitchiEngine 的渲染管线。完成后，你将理解：
+本教程带你深入引擎内部，追踪一次完整的 Draw Call 从发起到执行的全过程。完成后，你将理解：
 
-- 着色器文件结构
-- 材质与着色器的关系
-- Uniform 数据传递机制
-- 常量缓冲区 (Constant Buffer)
+- 渲染系统的分层架构
+- MeshRenderer 如何被发现和调用
+- 渲染路径如何组织渲染流程
+- RHI 层如何封装图形 API
+- 一个 Draw Call 的完整生命周期
 
-**预期成果**：一个能让物体产生脉冲发光效果的着色器和材质。
+**预期成果**：能够在代码中定位渲染管线的每个关键节点，理解"物体为什么会出现在屏幕上"。
 
 ## 前置要求
 
 - 已完成教程 1：组件系统入门
-- 了解 HLSL 基础语法（变量、函数、语义）
-- 了解 GPU 渲染管线的基本概念
+- 了解游戏循环的基本概念
+- 有调试 C++ 代码的经验（断点、调用栈）
 
 ---
 
-## 第一节：理解渲染管线
+## 第一节：问题引入
 
-### 从组件到像素
+### 当你在编辑器中创建一个 Cube...
 
-当你添加 MeshRenderer 组件并设置材质后，渲染流程如下：
+1. 在 Hierarchy 中右键 → Create → Cube
+2. Cube 出现在 Scene View 中
+3. 你能看到它、选中它、移动它
+
+**问题**：这个 Cube 是如何被渲染出来的？
+
+让我们从两个关键组件开始追踪：
 
 ```
-MeshFilter (网格数据)
-     ↓
-MeshRenderer (材质引用)
-     ↓
-Material (着色器 + 参数)
-     ↓
-Vertex Shader (顶点变换)
-     ↓
-Pixel Shader (像素着色)
-     ↓
-屏幕上的像素
+GameObject (Cube)
+    ├── Transform        // 位置、旋转、缩放
+    ├── MeshFilter       // 网格数据（顶点、索引）
+    └── MeshRenderer     // 材质引用 ← 这是渲染的起点！
 ```
 
-### 关键文件路径
+### 探索任务
 
-| 文件类型 | 路径 |
-|----------|------|
-| 着色器源码 | `Engine/Data/Engine/Shaders/` |
-| 材质文件 | `Engine/Data/Engine/Materials/` |
-| 着色器公共头文件 | `Engine/Data/Engine/Shaders/Common/` |
-| Material 类 | `Engine/Source/Runtime/Function/Renderer/Rendering/Material.h` |
+打开 Visual Studio，在以下文件中设置断点：
+
+| 文件 | 行号位置 | 断点目的 |
+|------|----------|----------|
+| `MeshRenderer.h` | `GetMaterial()` | 理解材质如何被获取 |
+| `Renderer.cpp` | `Tick()` | 理解渲染主循环入口 |
+| `Vulkan_CommandList.cpp` | `DrawIndexed()` | 理解最终 GPU 调用 |
+
+运行调试，观察调用栈，你将看到完整的数据流。
 
 ---
 
-## 第二节：分析现有着色器
+## 第二节：渲染系统的分层架构
 
-### 查看 forward.hlsl
+### 三层架构
 
-**文件路径**: `Engine/Data/Engine/Shaders/forward.hlsl`
+LitchiEngine 的渲染系统采用经典的三层架构：
 
-```hlsl
-//= INCLUDES =========
-#include "Common/common.hlsl"
-//====================
-
-Pixel_PosUvNorTan mainVS(Vertex_PosUvNorTan input)
-{
-    Pixel_PosUvNorTan output;
-
-    output.position = mul(input.position, buffer_pass.transform);
-    output.position = mul(output.position, buffer_rendererPath.view_projection);
-    output.uv = input.uv;
-    output.normal = normalize(mul(input.normal, (float3x3) buffer_pass.transform)).xyz;
-    output.normal = normalize(mul(output.normal, (float3x3) buffer_rendererPath.view_projection)).xyz;
-    output.tangent = normalize(mul(input.tangent, (float3x3) buffer_pass.transform)).xyz;
-    output.tangent = normalize(mul(output.tangent, (float3x3) buffer_rendererPath.view_projection)).xyz;
-
-    return output;
-}
-
-float4 mainPS(Pixel_PosUvNorTan input) : SV_Target
-{
-    return float4(0.644f, 0.003f, 0.005f, 1.0f);  // 固定红色
-}
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    应用层                        │
+│                                                             │
+│  GameObject ── MeshRenderer ── MeshFilter ── Material       │
+│                                                             │
+│  职责：组织场景数据，定义"要渲染什么"                          │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  渲染路径层                        │
+│                                                             │
+│  RendererPath ── 收集对象 ── 视锥剔除 ── 排序               │
+│                                                             │
+│  职责：决定"渲染哪些对象"，优化渲染效率                        │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                   RHI 抽象层 (RHI)                           │
+│                                                             │
+│  RHI_CommandList ── PSO ── 缓冲区 ── Draw Call              │
+│                                                             │
+│  职责：封装图形 API，提供跨平台能力                            │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+                         GPU 执行
 ```
 
-**代码解析**：
+### 为什么需要分层？
 
-| 部分 | 说明 |
-|------|------|
-| `#include "Common/common.hlsl"` | 包含公共定义、常量缓冲区结构 |
-| `Vertex_PosUvNorTan` | 输入顶点结构（位置、UV、法线、切线） |
-| `Pixel_PosUvNorTan` | 输出到像素着色器的数据 |
-| `buffer_pass.transform` | 当前物体的世界矩阵 |
-| `buffer_rendererPath.view_projection` | 相机的视图投影矩阵 |
-| `SV_Target` | 像素着色器输出颜色 |
+| 分层方式 | 优点 | 缺点 |
+|----------|------|------|
+| 不分层（直接调用 Vulkan） | 代码简单直接 | 无法移植，耦合严重 |
+| **三层架构** | 职责清晰，易于扩展和移植 | 代码量大，调用链长 |
 
-### 常量缓冲区结构
-
-**文件路径**: `Engine/Data/Engine/Shaders/Common/common_buffers.hlsl`
-
-```hlsl
-// 每帧更新 - 相机数据
-cbuffer BufferRendererPath : register(b5)
-{
-    RendererPathBufferData buffer_rendererPath;
-}
-
-// 每物体更新 - 变换矩阵
-[[vk::push_constant]]
-PassBufferData buffer_pass;
-
-// 每材质更新 - 材质参数
-cbuffer BufferMaterial : register(b2)
-{
-    MaterialBufferData buffer_material;
-}
-```
-
-**更新频率**：
-
-| 缓冲区 | 更新频率 | 内容 |
-|--------|----------|------|
-| BufferRendererPath | 每帧 | 相机位置、视图投影矩阵 |
-| buffer_pass (Push Constant) | 每物体 | 世界变换矩阵 |
-| BufferMaterial | 每材质 | 颜色、粗糙度、金属度等 |
+**分层带来的好处**：
+1. **跨平台**：RHI 层可以替换为 DirectX、Metal 等后端
+2. **解耦**：组件层不需要知道 Vulkan 的存在
+3. **优化**：渲染路径层可以做剔除、排序等优化
 
 ---
 
-## 第三节：创建脉冲发光着色器
+## 第三节：组件层 - MeshRenderer 如何被发现
 
-### 问题：如何让颜色随时间变化？
+### 关键问题
 
-我们需要：
-1. 获取时间值（来自引擎）
-2. 使用正弦函数产生周期性变化
-3. 将时间传递给着色器
+MeshRenderer 只是一个挂在 GameObject 上的组件，它如何被渲染系统"发现"？
 
-### 第一步：创建着色器文件
+### 追踪代码
 
-在 `Engine/Data/Engine/Shaders/` 目录下创建 `Pulse.hlsl`：
-
-```hlsl
-//= INCLUDES =========
-#include "Common/common.hlsl"
-//====================
-
-// 像素着色器输出
-struct PixelOutput
-{
-    float4 color : SV_Target0;
-};
-
-// 顶点着色器
-Pixel_PosUvNorTan mainVS(Vertex_PosUvNorTan input)
-{
-    Pixel_PosUvNorTan output;
-
-    // 变换到裁剪空间
-    output.position = mul(input.position, buffer_pass.transform);
-    output.position = mul(output.position, buffer_rendererPath.view_projection);
-
-    // 传递纹理坐标和法线
-    output.uv = input.uv;
-    output.normal = normalize(mul(input.normal, (float3x3) buffer_pass.transform));
-    output.tangent = normalize(mul(input.tangent, (float3x3) buffer_pass.transform));
-
-    return output;
-}
-
-// 像素着色器
-PixelOutput mainPS(Pixel_PosUvNorTan input)
-{
-    PixelOutput output;
-
-    // 使用帧数据的 delta_time 和 frame 计算脉冲
-    float time = buffer_frame.frame * buffer_frame.delta_time;
-    float pulse = 0.5 + 0.5 * sin(time * 3.0);  // 3.0 控制脉冲速度
-
-    // 基础颜色（青色）
-    float3 baseColor = float3(0.0, 0.8, 0.8);
-
-    // 混合脉冲效果
-    float3 finalColor = baseColor * (0.5 + 0.5 * pulse);
-
-    output.color = float4(finalColor, 1.0);
-
-    return output;
-}
-```
-
-**验证**: 此时着色器文件已创建，但还不能被引擎识别。
-
-### 第二步：理解 FrameBufferData
-
-查看 `common_buffers.hlsl` 中的帧数据结构：
-
-```hlsl
-struct FrameBufferData
-{
-    float2 resolution_render;
-    float2 resolution_output;
-
-    float2 taa_jitter_current;
-    float2 taa_jitter_previous;
-
-    float delta_time;  // 帧间隔时间
-    uint frame;        // 帧计数器
-    float gamma;
-    uint options;
-};
-
-cbuffer BufferFrame : register(b0)
-{
-    FrameBufferData buffer_frame;
-}
-```
-
-**为什么用 frame * delta_time？**
-
-| 方案 | 问题 |
-|------|------|
-| 直接用 `buffer_frame.frame` | 帧数增长太快，闪烁过快 |
-| 直接用 `buffer_frame.delta_time` | 只有一帧的时间，无法累积 |
-| `frame * delta_time` | 累积时间，平滑过渡 |
-
----
-
-## 第四节：创建材质文件
-
-### 第三步：创建材质 JSON
-
-在 `Engine/Data/Engine/Materials/` 目录下创建 `Pulse.mat`：
-
-```json
-{
-  "vertexType": "PosUvNorTan",
-  "shaderPath": ":Shaders/Pulse.hlsl",
-  "uniformInfoList": []
-}
-```
-
-**字段说明**：
-
-| 字段 | 说明 |
-|------|------|
-| `vertexType` | 顶点类型，决定顶点着色器输入结构 |
-| `shaderPath` | 着色器路径，`:` 前缀表示引擎资源 |
-| `uniformInfoList` | 自定义 uniform 参数列表（暂时为空） |
-
-### 第四步：在编辑器中使用
-
-1. 重新编译引擎（着色器会被编译为 SPIR-V）
-2. 打开 LitchiEditor
-3. 创建一个 Cube
-4. 在 MeshRenderer 组件中设置 Material Path 为 `:Materials/Pulse.mat`
-5. 运行场景
-
-**预期效果**: 物体呈现青色脉冲发光效果。
-
----
-
-## 第五节：添加可配置参数
-
-### 问题：如何让设计师调整颜色和速度？
-
-我们需要添加自定义 uniform 参数，让材质可配置。
-
-### 第五步：更新着色器
-
-修改 `Pulse.hlsl`，添加自定义参数：
-
-```hlsl
-//= INCLUDES =========
-#include "Common/common.hlsl"
-//====================
-
-// Material Buffer Name Must Be "Material"
-// register(b10) is required by the engine for material constants
-struct MaterialData
-{
-    float3 u_baseColor;      // offset: 0, size: 12
-    float u_pulseSpeed;      // offset: 12, size: 4 (packed after float3)
-    float u_pulseIntensity;  // offset: 16, size: 4 (new 16-byte row)
-    float3 padding;          // offset: 32, size: 12 (padding for 16-byte alignment)
-};
-
-cbuffer Material : register(b10)
-{
-    MaterialData materialData;
-};
-
-struct PixelOutput
-{
-    float4 color : SV_Target0;
-};
-
-Pixel_PosUvNorTan mainVS(Vertex_PosUvNorTan input)
-{
-    Pixel_PosUvNorTan output;
-
-    output.position = mul(input.position, buffer_pass.transform);
-    output.position = mul(output.position, buffer_rendererPath.view_projection);
-
-    output.uv = input.uv;
-    output.normal = normalize(mul(input.normal, (float3x3) buffer_pass.transform));
-    output.tangent = normalize(mul(input.tangent, (float3x3) buffer_pass.transform));
-
-    return output;
-}
-
-PixelOutput mainPS(Pixel_PosUvNorTan input)
-{
-    PixelOutput output;
-
-    float time = buffer_frame.frame * buffer_frame.delta_time;
-    float pulse = 0.5 + 0.5 * sin(time * materialData.u_pulseSpeed);
-    float intensity = 1.0 - materialData.u_pulseIntensity * (1.0 - pulse);
-
-    float3 finalColor = materialData.u_baseColor * intensity;
-    output.color = float4(finalColor, 1.0);
-
-    return output;
-}
-```
-
-**重要说明**：
-
-| 要点 | 说明 |
-|------|------|
-| `cbuffer Material` | 缓冲区名称必须为 `Material`，引擎会按名称查找 |
-| `register(b10)` | 引擎为材质参数预留的槽位，必须使用此槽位 |
-| `MaterialData` 结构体 | 包含所有自定义参数，注意16字节对齐 |
-| 成员名称 | 必须与材质 JSON 中的 `name` 一致（如 `u_baseColor`）|
-
-**为什么用 register(b10)？**
-
-LitchiEngine 的常量缓冲区槽位分配：
-
-| 槽位 | 用途 | 说明 |
-|------|------|------|
-| b0 | BufferFrame | 帧数据（时间、分辨率等）|
-| b2 | BufferMaterial | 引擎内置材质参数 |
-| b5 | BufferRendererPath | 渲染路径数据（相机矩阵等）|
-| **b10** | **自定义材质参数** | 用户自定义材质 uniform |
-
-### 第六步：更新材质文件
-
-修改 `Pulse.mat`：
-
-```json
-{
-  "vertexType": "PosUvNorTan",
-  "shaderPath": ":Shaders/Pulse.hlsl",
-  "uniformInfoList": [
-    {
-      "Type": "UniformInfoVector3",
-      "name": "u_baseColor",
-      "vector": {
-        "x": 0.0,
-        "y": 0.8,
-        "z": 0.8
-      }
-    },
-    {
-      "Type": "UniformInfoFloat",
-      "name": "u_pulseSpeed",
-      "value": 3.0
-    },
-    {
-      "Type": "UniformInfoFloat",
-      "name": "u_pulseIntensity",
-      "value": 0.5
-    }
-  ]
-}
-```
-
-**Uniform 类型映射**：
-
-| 着色器类型 | JSON 类型 | C++ 类型 |
-|------------|-----------|----------|
-| `float` | UniformInfoFloat | float |
-| `float2` | UniformInfoVector2 | Vector2 |
-| `float3` | UniformInfoVector3 | Vector3 |
-| `float4` | UniformInfoVector4 | Vector4 |
-| `Texture2D` | UniformInfoTexture | RHI_Texture* |
-
----
-
-## 第六节：理解材质系统
-
-### Material 类的工作流程
-
-**文件路径**: `Engine/Source/Runtime/Function/Renderer/Rendering/Material.h`
+**文件**: `Engine/Source/Runtime/Function/Renderer/Rendering/RendererPath.cpp`
 
 ```cpp
-class Material : public IResource
+void RendererPath::UpdateSceneObject()
+{
+    // 获取场景中所有 GameObject
+    auto& gameObjects = m_scene->GetAllGameObjectList();
+
+    // 清空上一帧的可渲染对象列表
+    m_renderables.clear();
+
+    for (auto& gameObject : gameObjects)
+    {
+        // ★ 关键：查找 MeshRenderer 组件 ★
+        auto meshRenderer = gameObject->GetComponent<MeshRenderer>();
+        if (meshRenderer && meshRenderer->GetMaterial())
+        {
+            m_renderables.push_back(gameObject);
+        }
+
+        // 同样处理 SkinnedMeshRenderer（骨骼动画）
+        auto skinnedRenderer = gameObject->GetComponent<SkinnedMeshRenderer>();
+        if (skinnedRenderer && skinnedRenderer->GetMaterial())
+        {
+            m_renderables.push_back(gameObject);
+        }
+    }
+}
+```
+
+**发现机制**：
+1. `RendererPath` 持有场景引用 (`m_scene`)
+2. 每帧调用 `UpdateSceneObject()` 遍历所有 GameObject
+3. 使用 `GetComponent<MeshRenderer>()` 查找组件
+4. 将有材质的对象加入渲染列表
+
+### 思考题
+
+**Q**: 如果一个 GameObject 有 MeshFilter 但没有 MeshRenderer，会发生什么？
+
+**A**: 它会被忽略，不会被渲染。MeshFilter 只提供网格数据，MeshRenderer 才负责"告诉渲染系统要渲染"。
+
+---
+
+## 第四节：渲染路径层 - 从收集到剔除
+
+### 渲染路径的职责
+
+```
+RendererPath
+    ├── UpdateSceneObject()   // 收集可渲染对象
+    ├── FrustumCullAndSort()  // 视锥剔除 + 排序
+    ├── UpdateLight()         // 更新光源数据
+    └── 管理渲染目标、相机等
+```
+
+### 视锥剔除
+
+**文件**: `Engine/Source/Runtime/Function/Renderer/Rendering/RendererPath.cpp`
+
+```cpp
+void RendererPath::FrustumCullAndSort()
+{
+    // 获取相机视锥体
+    const auto& frustum = m_camera->GetFrustum();
+
+    m_visible_meshes.clear();
+
+    for (auto& obj : m_renderables)
+    {
+        // 获取物体包围盒
+        auto bounds = obj->GetComponent<MeshFilter>()->GetMesh()->GetBounds();
+
+        // ★ 视锥剔除检测 ★
+        if (frustum.Intersects(bounds))
+        {
+            m_visible_meshes.push_back(obj);
+        }
+    }
+
+    // 按材质排序，减少状态切换
+    std::sort(m_visible_meshes.begin(), m_visible_meshes.end(),
+        [](GameObject* a, GameObject* b) {
+            // 排序逻辑...
+        });
+}
+```
+
+**为什么需要视锥剔除？**
+
+| 方案 | 绘制的物体 | 性能 |
+|------|-----------|------|
+| 不剔除 | 场景中所有物体 | 浪费 GPU 资源 |
+| **视锥剔除** | 仅相机可见的物体 | 大幅提升性能 |
+
+### 排序的意义
+
+```
+不排序：物体 A(材质1) → 物体 B(材质2) → 物体 C(材质1)
+       切换材质 → 切换材质 → 切换材质 = 2 次切换
+
+排序后：物体 A(材质1) → 物体 C(材质1) → 物体 B(材质2)
+       保持材质 → 切换材质 = 1 次切换
+```
+
+减少材质切换 = 减少状态变更 = 更好的性能。
+
+---
+
+## 第五节：渲染器层 - Forward 渲染流程
+
+### 渲染主循环
+
+**文件**: `Engine/Source/Runtime/Function/Renderer/Rendering/Renderer.cpp`
+
+```cpp
+void Renderer::Tick()
+{
+    // 1. 更新渲染路径（收集、剔除、排序）
+    for (auto& rendererPath : m_rendererPaths)
+    {
+        rendererPath->Update();
+    }
+
+    // 2. 获取命令列表
+    auto cmd_list = RHI_Device::GetPrimaryCommandList();
+
+    // 3. 执行渲染
+    for (auto& rendererPath : m_rendererPaths)
+    {
+        Render4BuildInSceneView(cmd_list, rendererPath);
+    }
+
+    // 4. 提交命令
+    cmd_list->End();
+    cmd_list->Submit();
+
+    // 5. 呈现
+    m_swapChain->Present();
+}
+```
+
+### Forward 渲染 Pass
+
+**文件**: `Engine/Source/Runtime/Function/Renderer/Rendering/Renderer_Passes.cpp`
+
+```cpp
+void Renderer::Pass_ForwardPass(RHI_CommandList* cmd_list, RendererPath* rendererPath)
+{
+    // 获取可见的网格对象
+    auto& meshes = rendererPath->GetVisibleMeshes();
+
+    for (auto& gameObject : meshes)
+    {
+        // ========== 获取渲染数据 ==========
+
+        // 1. 网格数据
+        auto meshFilter = gameObject->GetComponent<MeshFilter>();
+        auto mesh = meshFilter->GetMesh();
+        auto vertex_buffer = mesh->GetVertexBuffer();
+        auto index_buffer = mesh->GetIndexBuffer();
+
+        // 2. 材质数据
+        auto meshRenderer = gameObject->GetComponent<MeshRenderer>();
+        auto material = meshRenderer->GetMaterial();
+
+        // 3. 变换矩阵
+        auto transform = gameObject->GetTransform();
+        Matrix4x4 worldMatrix = transform->GetWorldMatrix();
+
+        // ========== 设置渲染状态 ==========
+
+        // 4. 创建/获取 Pipeline State Object
+        RHI_PipelineState pso;
+        pso.shader_vertex = material->GetVertexShader();
+        pso.shader_pixel = material->GetPixelShader();
+        pso.render_target_color_textures[0] = rendererPath->GetRenderTarget();
+        pso.depth_stencil_texture = rendererPath->GetDepthTexture();
+        // ... 其他状态
+
+        cmd_list->SetPipelineState(pso);
+
+        // 5. 绑定顶点/索引缓冲区
+        cmd_list->SetBufferVertex(vertex_buffer);
+        cmd_list->SetBufferIndex(index_buffer);
+
+        // 6. 设置常量缓冲区（相机、材质参数）
+        SetConstantBuffers(cmd_list, material, rendererPath);
+
+        // 7. Push Constants（变换矩阵等高频数据）
+        cmd_list->PushConstants(&worldMatrix, sizeof(Matrix4x4));
+
+        // ========== 发出 Draw Call ==========
+
+        // 8. ★ 最终的 Draw Call ★
+        cmd_list->DrawIndexed(
+            mesh->GetIndexCount(),    // 索引数量
+            0,                         // 起始索引
+            0                          // 顶点偏移
+        );
+    }
+}
+```
+
+**关键数据流向**：
+
+```
+GameObject
+    ├── MeshFilter → Mesh → VertexBuffer / IndexBuffer
+    ├── MeshRenderer → Material → Shader / Textures / Constants
+    └── Transform → WorldMatrix → PushConstants
+                                        ↓
+                              DrawIndexed()
+```
+
+---
+
+## 第六节：RHI 抽象层 - 跨平台的关键
+
+### RHI 是什么？
+
+RHI (Render Hardware Interface) 是一个抽象层，它定义了一套与平台无关的渲染接口：
+
+```
+应用代码
+    ↓
+RHI_CommandList::DrawIndexed()  // 平台无关的接口
+    ↓
+┌─────────────┬─────────────┬─────────────┐
+│   Vulkan    │  DirectX 12 │    Metal    │
+└─────────────┴─────────────┴─────────────┘
+```
+
+### RHI_CommandList 的关键方法
+
+**文件**: `Engine/Source/Runtime/Function/Renderer/RHI/RHI_CommandList.h`
+
+```cpp
+class RHI_CommandList
 {
 public:
-    // 设置 uniform 值
-    template<typename T>
-    void SetValue(const std::string& name, const T& value);
+    // 管线状态
+    virtual void SetPipelineState(const RHI_PipelineState& pso) = 0;
 
-    // 获取 uniform 值
-    template<typename T>
-    const T& GetValue(const std::string& key);
+    // 资源绑定
+    virtual void SetBufferVertex(RHI_Buffer* buffer) = 0;
+    virtual void SetBufferIndex(RHI_Buffer* buffer) = 0;
+    virtual void SetTexture(uint32_t slot, RHI_Texture* texture) = 0;
+    virtual void SetConstantBuffer(uint32_t slot, RHI_ConstantBuffer* buffer) = 0;
 
-    // 设置纹理
-    void SetTexture(const std::string& name, RHI_Texture* texture);
+    // 高频数据
+    virtual void PushConstants(void* data, uint32_t size) = 0;
 
-    // 获取着色器
-    MaterialShader* GetShader() { return m_shader; }
+    // ★ 绘制命令 ★
+    virtual void DrawIndexed(uint32_t index_count, uint32_t first_index, int32_t vertex_offset) = 0;
 
-private:
-    MaterialRes* m_materialRes;                    // 序列化数据
-    MaterialShader* m_shader;                      // 着色器
-    std::map<std::string, std::any> m_uniformDataList;  // uniform 数据
-    std::shared_ptr<RHI_ConstantBuffer> m_valueConstantBuffer;  // GPU 缓冲区
+    // 命令提交
+    virtual void End() = 0;
+    virtual void Submit() = 0;
 };
 ```
 
-### 数据流向
+### Vulkan 后端实现
 
-```
-材质 JSON 文件 (.mat)
-       ↓
-Material::LoadFromFile()
-       ↓
-MaterialRes (反序列化数据)
-       ↓
-Material::PostResourceLoaded()
-       ↓
-m_uniformDataList (运行时数据)
-       ↓
-Material::UpdateRenderData()
-       ↓
-RHI_ConstantBuffer (GPU 缓冲区)
-       ↓
-着色器读取
-```
+**文件**: `Engine/Source/Runtime/Function/Renderer/RHI/Vulkan/Vulkan_CommandList.cpp`
 
-### 16字节对齐规则
-
-HLSL 常量缓冲区要求 16 字节对齐。这是初学者最常遇到的问题！
-
-**正确示例（Pulse.hlsl 中的 MaterialData）**：
-
-```hlsl
-struct MaterialData
+```cpp
+void Vulkan_CommandList::DrawIndexed(uint32_t index_count, uint32_t first_index, int32_t vertex_offset)
 {
-    float3 u_baseColor;      // offset: 0,  size: 12 bytes
-    float u_pulseSpeed;      // offset: 12, size: 4 bytes  ← 填充到 16 字节边界
-    float u_pulseIntensity;  // offset: 16, size: 4 bytes  ← 新的 16 字节行开始
-    float3 padding;          // offset: 32, size: 12 bytes ← 填充到完整 16 字节
-};
-// Total: 48 bytes (3 × 16)
+    // 1. 确保渲染通道活跃
+    RenderPassBegin();
+
+    // 2. 绑定动态描述符集（常量缓冲区、纹理等）
+    descriptor_sets::set_dynamic(m_device, m_descriptor_set_dynamic, ...);
+    vkCmdBindDescriptorSets(m_command_buffer, ...);
+
+    // 3. ★ Vulkan API 调用 ★
+    vkCmdDrawIndexed(
+        m_command_buffer,
+        index_count,      // 索引数量
+        1,                // 实例数量（非实例化渲染为 1）
+        first_index,      // 起始索引
+        vertex_offset,    // 顶点偏移
+        0                 // 起始实例
+    );
+
+    m_draw_calls++;  // 统计 Draw Call 数量
+}
 ```
 
-**内存布局图示**：
-
-```
-┌────────────────────────────────────────┐
-│ Row 1 (16 bytes)                        │
-│ ├─ u_baseColor.x (4)                    │
-│ ├─ u_baseColor.y (4)                    │
-│ ├─ u_baseColor.z (4)                    │
-│ └─ u_pulseSpeed (4)                     │
-├────────────────────────────────────────┤
-│ Row 2 (16 bytes)                        │
-│ ├─ u_pulseIntensity (4)                 │
-│ ├─ padding.x (4)                        │
-│ ├─ padding.y (4)                        │
-│ └─ padding.z (4)                        │
-└────────────────────────────────────────┘
-```
-
-**常见错误**：
-
-```hlsl
-// 错误 ✗ - float3 后面紧跟 float2，跨越 16 字节边界
-struct BadData
-{
-    float3 color;      // 12 bytes
-    float2 speed;      // 8 bytes - 错误！会从偏移 16 开始
-                       // 但引擎可能从偏移 12 开始写入，导致数据错位
-};
-
-// 正确 ✓ - 添加填充
-struct GoodData
-{
-    float3 color;      // 12 bytes
-    float _pad1;       // 4 bytes - 填充到 16
-    float2 speed;      // 8 bytes (从 16 开始)
-    float2 _pad2;      // 8 bytes - 填充到 32
-};
-```
-
-**对齐规则总结**：
-
-| 类型 | 大小 | 对齐要求 | 打包规则 |
-|------|------|----------|----------|
-| `float` | 4 bytes | 4 bytes | 可以放在任何 4 的倍数位置 |
-| `float2` | 8 bytes | 8 bytes | 必须放在 8 的倍数位置 |
-| `float3` | 12 bytes | **16 bytes** | 必须放在 16 的倍数位置！ |
-| `float4` | 16 bytes | 16 bytes | 必须放在 16 的倍数位置 |
-| `matrix` | 64 bytes | 16 bytes | 每行是一个 float4 |
-
-**实用技巧**：字段排列顺序
-
-1. 先放 `float4` 和 `matrix`（16 字节对齐）
-2. 再放 `float3`（后面留 4 字节给 float）
-3. 再放 `float2`（8 字节对齐）
-4. 最后放 `float`（填充缝隙）
+**这就是 Draw Call 的终点**：从 `MeshRenderer` 组件开始，经过多层抽象，最终调用 `vkCmdDrawIndexed()` 将绘制命令发送到 GPU。
 
 ---
 
-## 第七节：运行时修改材质参数
+## 第七节：完整调用链总结
 
-### 问题：如何在代码中动态改变材质属性？
+### 一次 Draw Call 的旅程
 
-创建一个组件来控制脉冲效果。
-
-### 第七步：创建 PulseController 组件
-
-**头文件**: `Engine/Source/Runtime/Function/Framework/Component/Gameplay/PulseController.h`
-
-```cpp
-#pragma once
-
-#include "Runtime/Function/Framework/Component/Base/component.h"
-#include "Runtime/Core/Math/Vector3.h"
-
-namespace LitchiRuntime
-{
-    class PulseController : public Component
-    {
-    public:
-        PulseController();
-        ~PulseController() override;
-
-        // Getter/Setter 用于 RTTR 属性绑定
-        Vector3 GetBaseColor() const { return m_baseColor; }
-        void SetBaseColor(Vector3 color) { m_baseColor = color; }
-
-        float GetPulseSpeed() const { return m_pulseSpeed; }
-        void SetPulseSpeed(float speed) { m_pulseSpeed = speed; }
-
-        float GetPulseIntensity() const { return m_pulseIntensity; }
-        void SetPulseIntensity(float intensity) { m_pulseIntensity = intensity; }
-
-        void OnStart() override;
-        void OnUpdate() override;
-        void OnEditorUpdate() override;
-
-    private:
-        Vector3 m_baseColor{0.0f, 0.8f, 0.8f};
-        float m_pulseSpeed = 3.0f;
-        float m_pulseIntensity = 0.5f;
-
-        RTTR_ENABLE(Component)
-    };
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 应用入口                                                         │
+│ ApplicationBase::Tick()                                         │
+│ └─▶ Renderer::Tick()                                            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 渲染路径更新                                                     │
+│ RendererPath::Update()                                          │
+│ ├─▶ UpdateSceneObject()     // 收集 MeshRenderer                │
+│ ├─▶ FrustumCullAndSort()    // 视锥剔除 + 排序                   │
+│ └─▶ UpdateLight()           // 更新光源                          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Forward 渲染 Pass                                                │
+│ Renderer::Pass_ForwardPass()                                    │
+│ ├─▶ meshFilter->GetMesh()->GetVertexBuffer()                    │
+│ ├─▶ meshRenderer->GetMaterial()                                 │
+│ ├─▶ cmd_list->SetPipelineState(pso)                             │
+│ ├─▶ cmd_list->SetBufferVertex/Index()                           │
+│ ├─▶ cmd_list->PushConstants(worldMatrix)                        │
+│ └─▶ cmd_list->DrawIndexed()                                     │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ RHI 层                                                          │
+│ Vulkan_CommandList::DrawIndexed()                               │
+│ ├─▶ RenderPassBegin()        // 确保渲染通道开启                 │
+│ ├─▶ vkCmdBindDescriptorSets()// 绑定资源                         │
+│ └─▶ vkCmdDrawIndexed()       // ★ GPU 命令 ★                    │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 命令提交                                                         │
+│ cmd_list->End()              // vkEndCommandBuffer()            │
+│ cmd_list->Submit()           // vkQueueSubmit()                 │
+│ swapChain->Present()         // vkQueuePresentKHR()             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**为什么使用 Getter/Setter？**
+### 各层次职责总结
 
-| 方式 | 优点 | 缺点 |
-|------|------|------|
-| 直接暴露成员变量 (`public`) | 简单直接 | 无法添加验证逻辑，无法触发回调 |
-| **Getter/Setter** | 可添加验证、支持计算属性、符合封装原则 | 代码略多 |
+| 层次 | 关键类 | 核心职责 |
+|------|--------|----------|
+| **组件层** | MeshRenderer, MeshFilter | 持有渲染数据，被场景管理 |
+| **渲染路径层** | RendererPath | 收集、剔除、排序可渲染对象 |
+| **渲染器层** | Renderer | 组织 Pass，设置状态，发出 Draw Call |
+| **RHI 层** | RHI_CommandList | 封装图形 API，跨平台抽象 |
+| **后端层** | Vulkan_* | 调用 Vulkan API，GPU 命令提交 |
 
-在 LitchiEngine 中，使用 Getter/Setter 是推荐的做法，因为：
-1. 可以在设置值时添加范围检查
-2. 便于调试（可在 setter 中打断点）
-3. RTTR 完美支持 getter/setter 绑定
+---
 
-### 第八步：实现组件逻辑
+## 第八节：实践任务
 
-**实现文件**: `Engine/Source/Runtime/Function/Framework/Component/Gameplay/PulseController.cpp`
+### 任务 1：设置断点追踪
 
-```cpp
-#include "Runtime/Core/pch.h"
-#include "PulseController.h"
+在以下位置设置断点，运行调试，观察调用栈：
 
-#include "Runtime/Function/Framework/GameObject/GameObject.h"
-#include "Runtime/Function/Framework/Component/Renderer/MeshRenderer.h"
-#include "Runtime/Function/Renderer/Rendering/Material.h"
+1. `MeshRenderer::GetMaterial()`
+2. `RendererPath::UpdateSceneObject()`
+3. `Renderer::Pass_ForwardPass()`
+4. `Vulkan_CommandList::DrawIndexed()`
 
-namespace LitchiRuntime
-{
-    PulseController::PulseController()
-        : m_baseColor(0.0f, 0.8f, 0.8f)
-        , m_pulseSpeed(3.0f)
-        , m_pulseIntensity(0.5f)
-    {
-    }
+**记录**：每个断点触发时的完整调用栈。
 
-    PulseController::~PulseController()
-    {
-    }
+### 任务 2：分析渲染帧
 
-    void PulseController::OnStart()
-    {
-        // OnStart 在场景开始时调用一次
-        // 可以在这里做初始化检查
-        MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
-        if (!renderer)
-        {
-            // 记录警告：没有 MeshRenderer 组件
-            return;
-        }
+1. 在 `Renderer::Tick()` 开始和结束处添加日志
+2. 运行场景，观察每帧的渲染时间
+3. 在 `Pass_ForwardPass()` 中统计 Draw Call 数量
 
-        Material* material = renderer->GetMaterial();
-        if (!material)
-        {
-            // 记录警告：没有材质
-            return;
-        }
+**思考**：一个有 100 个物体的场景，一帧会产生多少次 `DrawIndexed()` 调用？
 
-        // 可以在这里检查材质是否有需要的 uniform 参数
-    }
+### 任务 3：理解剔除效果
 
-    void PulseController::OnUpdate()
-    {
-        // OnUpdate 在运行模式下每帧调用
-        MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
-        if (!renderer) return;
-
-        Material* material = renderer->GetMaterial();
-        if (!material) return;
-
-        // 更新材质参数
-        material->SetValue("u_baseColor", m_baseColor);
-        material->SetValue("u_pulseSpeed", m_pulseSpeed);
-        material->SetValue("u_pulseIntensity", m_pulseIntensity);
-    }
-
-    void PulseController::OnEditorUpdate()
-    {
-        // OnEditorUpdate 在编辑器模式下每帧调用
-        // 这样即使不点击 Play，也能在编辑器中预览效果
-        MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
-        if (!renderer) return;
-
-        Material* material = renderer->GetMaterial();
-        if (!material) return;
-
-        material->SetValue("u_baseColor", m_baseColor);
-        material->SetValue("u_pulseSpeed", m_pulseSpeed);
-        material->SetValue("u_pulseIntensity", m_pulseIntensity);
-    }
-}
-```
-
-**生命周期方法说明**：
-
-| 方法 | 调用时机 | 用途 |
-|------|----------|------|
-| `OnStart()` | 场景开始时调用一次 | 初始化、检查依赖 |
-| `OnUpdate()` | **运行模式**下每帧调用 | 游戏逻辑 |
-| `OnEditorUpdate()` | **编辑器模式**下每帧调用 | 编辑器预览效果 |
-
-### 第九步：注册组件到 RTTR
-
-**文件路径**: `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h`
-
-1. 在文件顶部添加 include：
-```cpp
-#include "Runtime/Function/Framework/Component/Gameplay/PulseController.h"
-```
-
-2. 在 `Framework Object Types` 区域添加注册：
-```cpp
-rttr::registration::class_<PulseController>("PulseController")
-    .constructor<>()(rttr::policy::ctor::as_raw_ptr)
-    .property("baseColor", &PulseController::GetBaseColor, &PulseController::SetBaseColor)
-    .property("pulseSpeed", &PulseController::GetPulseSpeed, &PulseController::SetPulseSpeed)
-    .property("pulseIntensity", &PulseController::GetPulseIntensity, &PulseController::SetPulseIntensity);
-```
-
-**注意**：使用 getter/setter 绑定时，`.property()` 接受三个参数：
-- 属性名（显示在 Inspector 中）
-- Getter 方法指针
-- Setter 方法指针
-
-### 第十步：在 Inspector 中注册组件
-
-**文件路径**: `Engine/Source/Editor/source/Panels/Inspector.cpp`
-
-1. 在文件顶部添加 include：
-```cpp
-#include "Runtime/Function/Framework/Component/Gameplay/PulseController.h"
-```
-
-2. 找到 `componentSelectorWidget.choices` 的定义位置（约第 80 行），添加：
-```cpp
-componentSelectorWidget.choices.emplace(18, "PulseController");
-```
-
-3. 在 `addComponentButton.ClickedEvent` 的 switch 语句中添加：
-```cpp
-case 18: GetTargetActor()->AddComponent<PulseController>(); break;
-```
-
-4. 在 `componentSelectorWidget.ValueChangedEvent` 的 switch 语句中添加：
-```cpp
-case 18: defineButtonsStates(GetTargetActor()->GetComponent<PulseController>()); return;
-```
-
-**完整修改位置**：
-
-| 位置 | 作用 |
-|------|------|
-| 头文件 include | 让编译器知道 PulseController 类型 |
-| choices.emplace | 在下拉列表中显示选项 |
-| switch case (ClickedEvent) | 点击按钮时创建组件 |
-| switch case (ValueChangedEvent) | 检查组件是否已存在，禁用按钮 |
+1. 创建一个场景，放置 10 个 Cube
+2. 将相机移动到只能看到 3 个 Cube 的位置
+3. 在 `FrustumCullAndSort()` 中添加日志，对比 `m_renderables.size()` 和 `m_visible_meshes.size()`
 
 ---
 
 ## 验证标准
 
-- [ ] 着色器编译无错误
-- [ ] 材质文件正确加载
-- [ ] 物体显示脉冲发光效果
-- [ ] Inspector 中可调整 PulseController 参数
-- [ ] PulseController 组件能动态控制效果
-- [ ] 编辑器模式下也能预览脉冲效果（OnEditorUpdate）
-
----
-
-## 常见问题排查
-
-### 着色器编译问题
-
-| 问题 | 可能原因 | 解决方案 |
-|------|----------|----------|
-| 材质参数不生效 | cbuffer 名称错误 | 必须命名为 `Material` |
-| 数据错位 | register 槽位错误 | 必须使用 `register(b10)` |
-| 变量未定义 | 成员名与 JSON 不匹配 | 确保 HLSL 变量名与 JSON 中 `name` 一致 |
-
-### 组件问题
-
-| 问题 | 可能原因 | 解决方案 |
-|------|----------|----------|
-| 组件不显示在列表中 | RTTR 注册失败 | 检查 TypeRegister.h 中的注册 |
-| 材质参数不更新 | OnUpdate/OnEditorUpdate 未调用 | 检查组件是否激活 |
-| 属性不显示在 Inspector | 未正确绑定 getter/setter | 确保 `.property()` 参数正确 |
-
-### 调试技巧
-
-在 `OnStart()` 中添加调试日志，检查材质和 uniform 信息：
-
-```cpp
-void PulseController::OnStart()
-{
-    MeshRenderer* renderer = GetGameObject()->GetComponent<MeshRenderer>();
-    if (!renderer) return;
-
-    Material* material = renderer->GetMaterial();
-    if (!material) return;
-
-    // 打印所有 uniform 参数
-    auto& uniforms = material->GetUniformsData();
-    for (auto& pair : uniforms)
-    {
-        DEBUG_LOG_INFO("Uniform: {} type: {}", pair.first, pair.second.type().name());
-    }
-
-    // 打印着色器的 uniform 信息
-    auto shader = material->GetShader();
-    if (shader)
-    {
-        auto& globalUniforms = shader->GetGlobalShaderUniformDict();
-        for (auto& pair : globalUniforms)
-        {
-            DEBUG_LOG_INFO("Shader uniform: {} offset: {} size: {}",
-                pair.first, pair.second.location, pair.second.size);
-        }
-    }
-}
-```
+- [ ] 能在代码中定位渲染管线的 4 个层次
+- [ ] 能解释 MeshRenderer 如何被渲染系统发现
+- [ ] 能描述视锥剔除的作用和位置
+- [ ] 能追踪一次完整的 Draw Call 调用链
+- [ ] 能解释 RHI 层的跨平台价值
 
 ---
 
@@ -1388,115 +1106,47 @@ void PulseController::OnStart()
 
 | 知识点 | 说明 |
 |--------|------|
-| 着色器结构 | 顶点着色器 + 像素着色器 |
-| 常量缓冲区 | GPU 数据传递机制，必须使用 `register(b10)` 和 `Material` 名称 |
-| 材质文件 | JSON 格式的材质配置 |
-| Uniform 参数 | 着色器可配置参数，名称必须一致 |
-| Material 类 | 运行时材质管理，`SetValue()` 更新参数 |
-| 16字节对齐 | HLSL 缓冲区对齐规则 |
-| Getter/Setter | RTTR 属性绑定的推荐方式 |
-| OnEditorUpdate | 编辑器模式预览效果 |
+| 三层架构 | 组件层 → 渲染路径层 → RHI 层 |
+| 发现机制 | 遍历场景，GetComponent<MeshRenderer>() |
+| 视锥剔除 | 只渲染相机可见的物体 |
+| Forward 渲染 | 逐物体设置状态，发出 Draw Call |
+| RHI 抽象 | 平台无关接口，支持多后端 |
+| Draw Call 旅程 | 从组件到 vkCmdDrawIndexed() |
 
-### 创建自定义着色器的完整流程
+### 核心理解
 
-1. **编写着色器** - 在 `Engine/Data/Engine/Shaders/` 创建 .hlsl 文件
-   - 使用 `cbuffer Material : register(b10)` 定义材质参数
-   - 参数名与材质 JSON 中一致
-2. **创建材质** - 在 `Engine/Data/Engine/Materials/` 创建 .mat 文件
-   - 定义 uniformInfoList 参数
-3. **创建控制器组件** - 继承 Component，实现 OnUpdate 和 OnEditorUpdate
-4. **注册组件** - 在 TypeRegister.h 中注册 RTTR
-5. **注册 Inspector** - 在 Inspector.cpp 中添加组件选择器入口
-6. **测试验证** - 编译运行，检查效果
+**"物体为什么会出现在屏幕上？"**
+
+1. **数据准备**：MeshRenderer + MeshFilter + Transform 提供了渲染所需的所有数据
+2. **发现收集**：RendererPath 遍历场景，发现有这些组件的 GameObject
+3. **优化剔除**：视锥剔除排除不可见物体，排序减少状态切换
+4. **状态设置**：Renderer 组织 Pipeline State，绑定资源
+5. **命令发出**：RHI 层封装为平台无关的 Draw Call
+6. **GPU 执行**：Vulkan 后端调用 API，GPU 绘制
 
 ---
 
-## 延伸：着色器编译流程
+## 延伸阅读
 
-### 问题：HLSL 如何变成 GPU 可执行代码？
+### 想深入了解？
 
-LitchiEngine 使用 DXCompiler 将 HLSL 编译为 SPIR-V：
-
-```
-Pulse.hlsl (HLSL 源码)
-       ↓
-DXCompiler (编译器)
-       ↓
-Pulse.vert.spv (顶点着色器 SPIR-V)
-Pulse.frag.spv (像素着色器 SPIR-V)
-       ↓
-Vulkan 加载执行
-```
-
-**相关代码**: `Engine/Source/Runtime/Function/Renderer/RHI/RHI_DirectXShaderCompiler.cpp`
-
-### 为什么选择 HLSL？
-
-| 着色器语言 | 优点 | 缺点 |
-|------------|------|------|
-| HLSL | Windows 生态友好、DXCompiler 支持好 | 需要编译转换 |
-| GLSL | OpenGL/Vulkan 原生支持 | 工具链较弱 |
-| Slang | 现代化设计、跨平台 | 生态较小 |
-
-LitchiEngine 选择 HLSL + DXCompiler 方案，可以：
-- 使用 Visual Studio 的着色器调试工具
-- 生成优化的 SPIR-V 代码
-- 支持 #include 指令
-
----
-
-## 下一步
-
-恭喜完成渲染入门教程！你已学习：
-
-| 教程 | 核心知识点 |
-|------|-----------|
-| RotateComponent | 组件架构、生命周期、Transform |
-| PulseShader | 着色器管线、材质系统、Uniform 参数 |
+| 主题 | 推荐文件 |
+|------|----------|
+| RHI 抽象设计 | `Engine/Source/Runtime/Function/Renderer/RHI/RHI_Device.h` |
+| Vulkan 后端 | `Engine/Source/Runtime/Function/Renderer/RHI/Vulkan/` |
+| 渲染 Pass 组织 | `Engine/Source/Runtime/Function/Renderer/Rendering/Renderer_Passes.cpp` |
+| 材质系统 | `Engine/Source/Runtime/Function/Renderer/Rendering/Material.h` |
 
 ### 进阶方向
 
-1. **PBR 材质** - 学习物理渲染
-2. **后处理效果** - 学习全屏着色器
-3. **计算着色器** - 学习 GPU 通用计算
-
----
-
-## 附录：常用着色器语义
-
-| 语义 | 说明 |
-|------|------|
-| `POSITION0` | 顶点位置 |
-| `TEXCOORD0` | 纹理坐标 |
-| `NORMAL0` | 法线 |
-| `TANGENT0` | 切线 |
-| `SV_POSITION` | 裁剪空间位置（系统值） |
-| `SV_Target` | 像素着色器输出颜色 |
-
-## 附录：调试技巧
-
-### 着色器编译错误
-
-查看编译输出日志，常见错误：
-
-| 错误 | 原因 | 解决方案 |
-|------|------|----------|
-| 未定义的变量 | 拼写错误或缺少 include | 检查变量名和头文件 |
-| 语义不匹配 | 输入输出结构不一致 | 确保 VS 输出 = PS 输入 |
-| 常量缓冲区对齐 | 16字节对齐问题 | 添加 padding 字段 |
-
-### 渲染问题排查
-
-1. **物体不显示** - 检查变换矩阵、相机视锥体
-2. **颜色错误** - 检查着色器计算逻辑
-3. **材质不加载** - 检查 JSON 格式和路径
+1. **添加新的渲染 Pass** - 学习如何扩展渲染管线
+2. **实现延迟渲染** - 理解 G-Buffer 和多 Pass 渲染
+3. **GPU 性能分析** - 使用 RenderDoc 分析 Draw Call
 
 ---
 
 **文档时间**: 2026-04-14
 **风格参考**: Catlike Coding (https://catlikecoding.com/)
-
-
 
 ---
 
@@ -1507,12 +1157,11 @@ LitchiEngine 选择 HLSL + DXCompiler 方案，可以：
 | 教程 | 核心知识点 |
 |------|-----------|
 | RotateComponent | 组件架构、生命周期、Transform、四元数 |
-| PulseShader | 着色器管线、材质系统、Uniform 参数、常量缓冲区 |
-
+| 追踪 Draw Call | 渲染管线分层架构、视锥剔除、RHI 抽象、Draw Call 生命周期 |
 
 ### 下一步学习方向
 
-1. **渲染入门系列** - 学习 RHI、着色器
+1. **着色器开发** - 学习 HLSL、材质系统
 2. **脚本系统系列** - 学习 C# 脚本绑定
 3. **动画系统系列** - 学习骨骼动画
 
@@ -1523,15 +1172,13 @@ LitchiEngine 选择 HLSL + DXCompiler 方案，可以：
 | 系统 | 路径 |
 |------|------|
 | 组件基类 | `Engine/Source/Runtime/Function/Framework/Component/Base/` |
+| 渲染器 | `Engine/Source/Runtime/Function/Renderer/Rendering/` |
+| RHI 抽象层 | `Engine/Source/Runtime/Function/Renderer/RHI/` |
+| Vulkan 后端 | `Engine/Source/Runtime/Function/Renderer/RHI/Vulkan/` |
 | 数学库 | `Engine/Source/Runtime/Core/Math/` |
-| 物理系统 | `Engine/Source/Runtime/Function/Physics/` |
-| 时间管理 | `Engine/Source/Runtime/Core/Time/` |
-| 事件系统 | `Engine/Source/Runtime/Core/Tools/Eventing/` |
-| 脚本系统 | `Engine/Source/Runtime/Function/Scripting/` |
-| C# 脚本核心 | `Engine/Source/ScriptCore/Source/` |
 | RTTR 类型注册 | `Engine/Source/Runtime/AutoGen/Type/TypeRegister.h` |
 
 ---
 
-**文档时间**: 2026-04-11
+**文档时间**: 2026-04-14
 **风格参考**: Catlike Coding (https://catlikecoding.com/)
